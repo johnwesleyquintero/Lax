@@ -15,6 +15,7 @@ export interface Channel {
   is_private: boolean;
   created_by: string;
   created_at: string;
+  type?: 'channel' | 'dm'; // New field
 }
 
 export interface Message {

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Channel, User } from '../types';
 import CreateChannelModal from './CreateChannelModal';
 import JoinChannelModal from './JoinChannelModal';
+import CreateDMModal from './CreateDMModal';
 
 interface SidebarProps {
   channels: Channel[];
   currentChannelId: string;
   onSelectChannel: (id: string) => void;
   currentUser: User;
+  users: User[]; // Needed to resolve DM names
   onOpenSettings: () => void;
   onLogout: () => void;
   onChannelCreated: (channel: Channel) => void;
@@ -19,6 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentChannelId, 
   onSelectChannel, 
   currentUser,
+  users,
   onOpenSettings,
   onLogout,
   onChannelCreated,
@@ -26,7 +29,59 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isDMModalOpen, setIsDMModalOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Clear search when collapsed to ensure icon view is complete
+  useEffect(() => {
+    if (isCollapsed) {
+        setSearchQuery('');
+    }
+  }, [isCollapsed]);
+
+  // Split Channels vs DMs
+  // Legacy support: if type is undefined, assume 'channel'
+  const groupChannels = channels.filter(c => !c.type || c.type === 'channel');
+  const directMessages = channels.filter(c => c.type === 'dm');
+
+  // Helper to get DM display info
+  const getDMInfo = (channel: Channel) => {
+      // DM naming convention: dm_uidA_uidB
+      // Parse IDs from name
+      const parts = channel.channel_name.split('_');
+      // Filter out 'dm' and my own ID
+      const otherId = parts.filter(p => p !== 'dm' && p !== currentUser.user_id)[0];
+      
+      // If found, look up user
+      if (otherId) {
+          const otherUser = users.find(u => u.user_id === otherId);
+          if (otherUser) {
+              return { name: otherUser.display_name, avatar: otherUser.display_name[0], user: otherUser };
+          }
+      }
+      return { name: 'Unknown', avatar: '?', user: null };
+  };
+
+  // Filter Logic
+  const filteredGroupChannels = groupChannels.filter(c => 
+    c.channel_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredDirectMessages = directMessages.filter(c => {
+    const { name } = getDMInfo(c);
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  // Deterministic color
+  const getColor = (str: string) => {
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500'];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   return (
     <div 
@@ -78,6 +133,26 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Channels List */}
       <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+        
+        {/* Search Bar */}
+        {!isCollapsed && (
+          <div className="px-4 mb-4">
+             <div className="relative group">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Jump to..."
+                  className="w-full bg-slate-950 text-slate-300 placeholder-slate-600 text-sm rounded border border-slate-800 px-3 py-1.5 focus:outline-none focus:border-slate-600 focus:ring-1 focus:ring-slate-600 transition-all"
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-slate-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+             </div>
+          </div>
+        )}
+
+        {/* Group Channels Section */}
         <div className={`px-4 mb-2 flex items-center group transition-all ${isCollapsed ? 'flex-col gap-3' : 'justify-between'}`}>
           {!isCollapsed && <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 group-hover:text-slate-400">Channels</h2>}
           
@@ -103,8 +178,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
         
-        <ul className={`space-y-0.5 ${isCollapsed ? 'px-2' : ''}`}>
-          {channels.map((channel) => {
+        <ul className={`space-y-0.5 ${isCollapsed ? 'px-2' : ''} mb-6`}>
+          {filteredGroupChannels.length === 0 && searchQuery && !isCollapsed && (
+             <li className="px-4 py-2 text-xs text-slate-600 italic">No channels match</li>
+          )}
+          {filteredGroupChannels.map((channel) => {
             const isActive = channel.channel_id === currentChannelId;
             return (
               <li key={channel.channel_id}>
@@ -135,6 +213,61 @@ const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </ul>
+
+        {/* Direct Messages Section */}
+        <div className={`px-4 mb-2 flex items-center group transition-all ${isCollapsed ? 'flex-col gap-3 mt-4' : 'justify-between'}`}>
+          {!isCollapsed && <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 group-hover:text-slate-400">Direct Messages</h2>}
+          <div className={`flex items-center gap-1 ${isCollapsed ? 'flex-col w-full' : ''}`}>
+              <button 
+                onClick={() => setIsDMModalOpen(true)}
+                className={`text-slate-500 hover:text-slate-300 transition-colors hover:bg-slate-800 rounded ${isCollapsed ? 'p-2 w-10 h-10 flex items-center justify-center' : 'p-1'}`} 
+                title="New Direct Message"
+              >
+                 <svg xmlns="http://www.w3.org/2000/svg" className={`${isCollapsed ? 'h-5 w-5' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+          </div>
+        </div>
+
+        <ul className={`space-y-0.5 ${isCollapsed ? 'px-2' : ''}`}>
+            {filteredDirectMessages.length === 0 && searchQuery && !isCollapsed && (
+                <li className="px-4 py-2 text-xs text-slate-600 italic">No operators match</li>
+            )}
+            {filteredDirectMessages.map((channel) => {
+                const isActive = channel.channel_id === currentChannelId;
+                const { name, avatar, user } = getDMInfo(channel);
+                return (
+                    <li key={channel.channel_id}>
+                        <button
+                            onClick={() => onSelectChannel(channel.channel_id)}
+                            title={isCollapsed ? name : undefined}
+                            className={`w-full flex items-center transition-colors rounded ${
+                                isCollapsed 
+                                    ? 'justify-center h-10 w-10 mx-auto' 
+                                    : 'text-left px-4 py-1.5'
+                            } ${
+                                isActive 
+                                    ? 'bg-blue-700 text-white' 
+                                    : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                            }`}
+                        >
+                            {/* Avatar for DM */}
+                            <div className={`flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold ${isCollapsed ? 'w-6 h-6 text-sm' : 'w-4 h-4 mr-2'} ${getColor(name)} text-white`}>
+                                {avatar}
+                            </div>
+                            
+                            {!isCollapsed && (
+                                <span className={`truncate ${isActive ? 'font-medium' : ''}`}>
+                                    {name}
+                                </span>
+                            )}
+                        </button>
+                    </li>
+                );
+            })}
+        </ul>
+
       </div>
 
       {/* Footer / Settings */}
@@ -197,6 +330,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             onJoined={(id) => onChannelCreated({ channel_id: id } as any)}
             currentUser={currentUser}
         />
+      )}
+
+      {isDMModalOpen && (
+          <CreateDMModal 
+            onClose={() => setIsDMModalOpen(false)}
+            onCreated={onChannelCreated}
+            currentUser={currentUser}
+            users={users}
+          />
       )}
     </div>
   );

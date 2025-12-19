@@ -39,7 +39,9 @@ const App: React.FC = () => {
         
         // Select first channel if none selected
         if (fetchedChannels.length > 0 && !currentChannelId) {
-            setCurrentChannelId(fetchedChannels[0].channel_id);
+            // Prefer 'general' if exists, otherwise first
+            const general = fetchedChannels.find(c => c.channel_name === 'general');
+            setCurrentChannelId(general ? general.channel_id : fetchedChannels[0].channel_id);
         }
       } catch (err) {
         console.error("Failed to load metadata", err);
@@ -75,7 +77,11 @@ const App: React.FC = () => {
         });
     } else {
         // Optimistic add for create
-        setChannels(prev => [...prev, newChannel]);
+        setChannels(prev => {
+            // Prevent duplicates
+            if (prev.find(c => c.channel_id === newChannel.channel_id)) return prev;
+            return [...prev, newChannel];
+        });
         setCurrentChannelId(newChannel.channel_id);
     }
   };
@@ -97,6 +103,7 @@ const App: React.FC = () => {
         currentChannelId={currentChannelId}
         onSelectChannel={setCurrentChannelId}
         currentUser={currentUser}
+        users={users} // Pass users down for DM resolution
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
         onChannelCreated={handleChannelAction}

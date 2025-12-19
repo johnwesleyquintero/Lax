@@ -45,8 +45,17 @@ class GasService {
   }
 
   public async createChannel(name: string, isPrivate: boolean, creatorId: string): Promise<Channel> {
-    if (this.useMock) return this.mockCreateChannel(name, isPrivate, creatorId);
-    return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId });
+    if (this.useMock) return this.mockCreateChannel(name, isPrivate, creatorId, 'channel');
+    return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId, type: 'channel' });
+  }
+
+  public async createDM(targetUserId: string, currentUserId: string): Promise<Channel> {
+    // Generate deterministic DM name: dm_userA_userB (sorted)
+    const sortedIds = [targetUserId, currentUserId].sort();
+    const dmName = `dm_${sortedIds[0]}_${sortedIds[1]}`;
+
+    if (this.useMock) return this.mockCreateDM(dmName, currentUserId, targetUserId);
+    return this.fetchGas<Channel>('createDM', { name: dmName, isPrivate: true, creatorId: currentUserId, targetUserId });
   }
 
   public async joinChannel(channelId: string, userId: string): Promise<void> {
@@ -109,9 +118,9 @@ class GasService {
     // 1. Channels
     if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS)) {
       const initialChannels: Channel[] = [
-        { channel_id: 'c_general', channel_name: 'general', is_private: false, created_by: 'system', created_at: new Date().toISOString() },
-        { channel_id: 'c_random', channel_name: 'random', is_private: false, created_by: 'system', created_at: new Date().toISOString() },
-        { channel_id: 'c_ops', channel_name: 'operations', is_private: true, created_by: 'system', created_at: new Date().toISOString() },
+        { channel_id: 'c_general', channel_name: 'general', is_private: false, created_by: 'system', created_at: new Date().toISOString(), type: 'channel' },
+        { channel_id: 'c_random', channel_name: 'random', is_private: false, created_by: 'system', created_at: new Date().toISOString(), type: 'channel' },
+        { channel_id: 'c_ops', channel_name: 'operations', is_private: true, created_by: 'system', created_at: new Date().toISOString(), type: 'channel' },
       ];
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(initialChannels));
     }
@@ -174,8 +183,8 @@ class GasService {
           
           const myChannelIds = new Set(members.filter((m: any) => m.user_id === userId).map((m: any) => m.channel_id));
           
-          // Return Public channels that I am NOT a member of
-          const browsable = allChannels.filter(c => !c.is_private && !myChannelIds.has(c.channel_id));
+          // Return Public channels that I am NOT a member of AND exclude DMs
+          const browsable = allChannels.filter(c => !c.is_private && c.type !== 'dm' && !myChannelIds.has(c.channel_id));
           resolve(browsable);
         }, 300);
     });
@@ -204,19 +213,20 @@ class GasService {
     });
   }
 
-  private mockCreateChannel(name: string, isPrivate: boolean, creatorId: string): Promise<Channel> {
+  private mockCreateChannel(name: string, isPrivate: boolean, creatorId: string, type: 'channel' | 'dm'): Promise<Channel> {
     return new Promise((resolve) => {
       setTimeout(() => {
         const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
         
-        const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const slug = name.toLowerCase().replace(/[^a-z0-9_]/g, '-'); // Allow underscore for DMs
         
         const newChannel: Channel = {
           channel_id: 'c_' + slug + '_' + Date.now().toString().slice(-4),
           channel_name: slug,
           is_private: isPrivate,
           created_by: creatorId,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          type: type
         };
         
         channels.push(newChannel);
@@ -230,6 +240,43 @@ class GasService {
         resolve(newChannel);
       }, 400);
     });
+  }
+
+  private mockCreateDM(name: string, currentUserId: string, targetUserId: string): Promise<Channel> {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+            const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+            
+            // Check if exists
+            const existing = channels.find(c => c.channel_name === name && c.type === 'dm');
+            if (existing) {
+                // Ensure membership logic is robust (in case one side left? DMs shouldn't be leaveable really)
+                resolve(existing);
+                return;
+            }
+
+            // Create new
+            const newChannel: Channel = {
+                channel_id: 'dm_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                channel_name: name,
+                is_private: true,
+                created_by: currentUserId,
+                created_at: new Date().toISOString(),
+                type: 'dm'
+            };
+
+            channels.push(newChannel);
+            localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
+
+            // Join BOTH users
+            const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+            members.push({ channel_id: newChannel.channel_id, user_id: currentUserId, joined_at: new Date().toISOString() });
+            members.push({ channel_id: newChannel.channel_id, user_id: targetUserId, joined_at: new Date().toISOString() });
+            localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
+
+            resolve(newChannel);
+        }, 400);
+      });
   }
 
   private mockGetMessages(channelId: string, afterTs?: string): Promise<Message[]> {

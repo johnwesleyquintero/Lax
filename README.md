@@ -40,13 +40,13 @@ To make this a real, multi-user chat app, you need to deploy the Google Apps Scr
     *   **Sheet Name**: `Users`
         *   Headers: `user_id`, `email`, `display_name`, `role`, `created_at`, `last_active`, `status`, `job_title`
     *   **Sheet Name**: `Channels`
-        *   Headers: `channel_id`, `channel_name`, `is_private`, `created_by`, `created_at`
+        *   Headers: `channel_id`, `channel_name`, `is_private`, `created_by`, `created_at`, `type`
     *   **Sheet Name**: `ChannelMembers`
         *   Headers: `channel_id`, `user_id`, `joined_at`
     *   **Sheet Name**: `Messages`
         *   Headers: `message_id`, `channel_id`, `user_id`, `content`, `created_at`
 3.  **Seed Data**: 
-    *   In `Channels`: `c_general` | `general` | `FALSE` | `admin` | `2024-01-01T00:00:00.000Z`
+    *   In `Channels`: `c_general` | `general` | `FALSE` | `admin` | `2024-01-01T00:00:00.000Z` | `channel`
     *   *Note: When you log in for the first time, the script will automatically add you to `c_general`.*
 
 ### 2. Backend API Setup
@@ -85,12 +85,13 @@ function doPost(e) {
       result = allChannels.filter(c => myChannelIds.has(c.channel_id));
     } 
     else if (action === 'getBrowsableChannels') {
-      // Return Public channels user is NOT a member of
+      // Return Public channels user is NOT a member of AND exclude DMs
       const members = getSheetData(ss.getSheetByName('ChannelMembers'));
       const myChannelIds = new Set(members.filter(m => m.user_id === payload.userId).map(m => m.channel_id));
 
       const allChannels = getSheetData(ss.getSheetByName('Channels'));
-      result = allChannels.filter(c => c.is_private === false && !myChannelIds.has(c.channel_id));
+      // Filter out Private, Existing Memberships, and DMs
+      result = allChannels.filter(c => c.is_private === false && c.type !== 'dm' && !myChannelIds.has(c.channel_id));
     }
     else if (action === 'joinChannel') {
       const sheet = ss.getSheetByName('ChannelMembers');
@@ -122,7 +123,8 @@ function doPost(e) {
         slug, 
         payload.isPrivate, 
         payload.creatorId, 
-        new Date().toISOString()
+        new Date().toISOString(),
+        payload.type || 'channel'
       ];
       cSheet.appendRow(newChannelRow);
       
@@ -131,6 +133,35 @@ function doPost(e) {
       mSheet.appendRow([newId, payload.creatorId, new Date().toISOString()]);
 
       result = zipRow(cSheet, newChannelRow);
+    }
+    else if (action === 'createDM') {
+      const cSheet = ss.getSheetByName('Channels');
+      const allChannels = getSheetData(cSheet);
+      
+      // payload.name should be deterministic: dm_uidA_uidB
+      const existing = allChannels.find(c => c.channel_name === payload.name && c.type === 'dm');
+      
+      if (existing) {
+          result = existing;
+      } else {
+          const newId = 'dm_' + Utilities.getUuid();
+          const newRow = [
+             newId,
+             payload.name,
+             true, // DMs are always private
+             payload.creatorId,
+             new Date().toISOString(),
+             'dm'
+          ];
+          cSheet.appendRow(newRow);
+
+          // Add BOTH users
+          const mSheet = ss.getSheetByName('ChannelMembers');
+          mSheet.appendRow([newId, payload.creatorId, new Date().toISOString()]);
+          mSheet.appendRow([newId, payload.targetUserId, new Date().toISOString()]);
+          
+          result = zipRow(cSheet, newRow);
+      }
     }
 
     // --- MESSAGES ---
