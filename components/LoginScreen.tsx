@@ -13,6 +13,16 @@ declare global {
   }
 }
 
+// Inline Logo Component for crisp rendering
+const LogoIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="24" fill="#0f172a"/>
+    <path d="M28 24H48V56H28z" fill="#3b82f6"/>
+    <path d="M28 56H72V76H28z" fill="#60a5fa"/>
+    <circle cx="72" cy="34" r="6" fill="#22c55e" opacity="0.8"/>
+  </svg>
+);
+
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -102,9 +112,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
 
         <div className="z-10">
-            <div className="flex items-center gap-3 mb-8">
-                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">L</div>
-                 <span className="text-xl font-bold tracking-tight">Lax</span>
+            <div className="flex items-center gap-4 mb-8">
+                 <LogoIcon className="w-12 h-12 shadow-lg" />
+                 <span className="text-2xl font-bold tracking-tight">Lax</span>
             </div>
             
             <h1 className="text-5xl font-bold leading-tight mb-6">
@@ -140,7 +150,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       {/* Right Panel - Sign In */}
       <div className="flex-1 bg-white flex flex-col justify-center items-center p-8 sm:p-12 lg:p-24">
         <div className="w-full max-w-sm space-y-8">
-            <div className="text-center lg:text-left">
+            <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
+                <div className="lg:hidden mb-4">
+                   <LogoIcon className="w-16 h-16" />
+                </div>
                 <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Join the Uplink</h2>
                 <p className="mt-2 text-sm text-gray-500">
                     Enter your credentials to access the secure channel.

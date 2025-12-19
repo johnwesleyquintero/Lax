@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Container: Slate 900 -->
+  <rect width="100" height="100" rx="24" fill="#0f172a"/>
+  
+  <!-- The Structure: A bold, geometric L -->
+  <!-- Vertical Beam -->
+  <path d="M28 24H48V56H28z" fill="#3b82f6"/>
+  <!-- Horizontal Beam (Interlocking) -->
+  <path d="M28 56H72V76H28z" fill="#60a5fa"/>
+  
+  <!-- The Signal: A small status dot (Active) -->
+  <circle cx="72" cy="34" r="6" fill="#22c55e" opacity="0.8"/>
+</svg>

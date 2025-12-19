@@ -26,11 +26,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full border-r border-slate-800 flex-shrink-0">
       {/* Workspace Header */}
-      <div className="p-4 border-b border-slate-800 hover:bg-slate-800 transition-colors cursor-pointer group">
-        <h1 className="text-white font-bold text-lg truncate">Lax HQ</h1>
-        <div className="flex items-center text-xs mt-1">
-          <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-          <span className="group-hover:text-white transition-colors">{currentUser.display_name}</span>
+      <div className="p-4 border-b border-slate-800 hover:bg-slate-800 transition-colors cursor-pointer group flex items-center gap-3">
+        {/* Tiny Logo */}
+        <div className="w-8 h-8 flex-shrink-0">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" rx="24" fill="#1e293b"/> {/* Lighter slate for contrast on dark sidebar */}
+            <path d="M28 24H48V56H28z" fill="#3b82f6"/>
+            <path d="M28 56H72V76H28z" fill="#60a5fa"/>
+            <circle cx="72" cy="34" r="6" fill="#22c55e"/>
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-white font-bold text-lg leading-tight truncate">Lax HQ</h1>
+          <div className="flex items-center text-xs opacity-70">
+             <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+             <span className="group-hover:text-white transition-colors truncate max-w-[120px]">{currentUser.display_name}</span>
+          </div>
         </div>
       </div>
 
