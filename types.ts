@@ -28,17 +28,3 @@ export interface ApiResponse<T> {
   data?: T;
   message?: string;
 }
-
-// Configuration for the app
-export const APP_CONFIG = {
-  POLL_INTERVAL_MS: 3000,
-  GOOGLE_CLIENT_ID: '408818190066-66mpmibsibbj6qasm1i405esof76hrnj.apps.googleusercontent.com',
-  LOCAL_STORAGE_KEYS: {
-    USERS: 'op_chat_users',
-    CHANNELS: 'op_chat_channels',
-    MESSAGES: 'op_chat_messages',
-    CURRENT_USER: 'op_chat_current_user',
-    API_URL: 'op_chat_api_url',
-    USE_MOCK: 'op_chat_use_mock'
-  }
-};

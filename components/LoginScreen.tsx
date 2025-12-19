@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/gas';
-import { User, APP_CONFIG } from '../types';
+import { User } from '../types';
+import { APP_CONFIG } from '../constants';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;

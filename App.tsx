@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Channel, User, APP_CONFIG } from './types';
+import { Channel, User } from './types';
+import { APP_CONFIG } from './constants';
 import { api } from './services/gas';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';

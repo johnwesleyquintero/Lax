@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Channel, Message, User, APP_CONFIG } from '../types';
+import { Channel, Message, User } from '../types';
+import { APP_CONFIG } from '../constants';
 import { api } from '../services/gas';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';

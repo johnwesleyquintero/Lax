@@ -1,4 +1,5 @@
-import { User, Channel, Message, ApiResponse, APP_CONFIG } from '../types';
+import { User, Channel, Message, ApiResponse } from '../types';
+import { APP_CONFIG } from '../constants';
 
 /**
  * Service to handle communication with Google Apps Script or Local Mock.
@@ -10,7 +11,8 @@ class GasService {
 
   constructor() {
     this.useMock = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USE_MOCK) !== 'false'; // Default to true
-    this.apiUrl = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.API_URL) || '';
+    // Use stored URL or fall back to the default constant
+    this.apiUrl = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.API_URL) || APP_CONFIG.DEFAULT_API_URL;
     
     // Initialize mock data if empty and using mock
     if (this.useMock) {
