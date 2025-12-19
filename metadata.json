@@ -1,0 +1,5 @@
+{
+  "name": "Lax",
+  "description": "A sovereign, broke-proof communication tool built for Operators. Designed for Google Apps Script backend with a local demo mode.",
+  "requestFramePermissions": []
+}
