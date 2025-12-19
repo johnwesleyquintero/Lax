@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Channel, User } from '../types';
+import CreateChannelModal from './CreateChannelModal';
 
 interface SidebarProps {
   channels: Channel[];
@@ -8,6 +9,7 @@ interface SidebarProps {
   currentUser: User;
   onOpenSettings: () => void;
   onLogout: () => void;
+  onChannelCreated: (channel: Channel) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -16,8 +18,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectChannel, 
   currentUser,
   onOpenSettings,
-  onLogout
+  onLogout,
+  onChannelCreated
 }) => {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
   return (
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full border-r border-slate-800 flex-shrink-0">
       {/* Workspace Header */}
@@ -33,7 +38,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto py-4">
         <div className="px-4 mb-2 flex items-center justify-between group">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 group-hover:text-slate-400">Channels</h2>
-          <button className="text-slate-500 hover:text-slate-300" title="Add Channel (Mock)">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1 hover:bg-slate-800 rounded" 
+            title="Create Channel"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -53,15 +62,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                       : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <span className="text-opacity-70 mr-2 text-lg leading-none opacity-60">#</span>
+                  <span className="text-opacity-70 mr-2 text-lg leading-none opacity-60">
+                    {channel.is_private ? '🔒' : '#'}
+                  </span>
                   <span className={`truncate ${isActive ? 'font-medium' : ''}`}>
                     {channel.channel_name}
                   </span>
-                  {channel.is_private && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-auto opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  )}
                 </button>
               </li>
             );
@@ -87,6 +93,14 @@ const Sidebar: React.FC<SidebarProps> = ({
            </button>
         </div>
       </div>
+
+      {isCreateModalOpen && (
+        <CreateChannelModal 
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreated={onChannelCreated}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 };

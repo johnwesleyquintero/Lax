@@ -39,6 +39,11 @@ class GasService {
     return this.fetchGas<Channel[]>('getChannels');
   }
 
+  public async createChannel(name: string, isPrivate: boolean, creatorId: string): Promise<Channel> {
+    if (this.useMock) return this.mockCreateChannel(name, isPrivate, creatorId);
+    return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId });
+  }
+
   public async getMessages(channelId: string, afterTs?: string): Promise<Message[]> {
     if (this.useMock) return this.mockGetMessages(channelId, afterTs);
     return this.fetchGas<Message[]>('getMessages', { channelId, afterTs });
@@ -113,6 +118,29 @@ class GasService {
         const data = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS);
         resolve(data ? JSON.parse(data) : []);
       }, 300); // Fake latency
+    });
+  }
+
+  private mockCreateChannel(name: string, isPrivate: boolean, creatorId: string): Promise<Channel> {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+        
+        // Simple slugify
+        const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        
+        const newChannel: Channel = {
+          channel_id: 'c_' + slug + '_' + Date.now().toString().slice(-4),
+          channel_name: slug,
+          is_private: isPrivate,
+          created_by: creatorId,
+          created_at: new Date().toISOString()
+        };
+        
+        channels.push(newChannel);
+        localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
+        resolve(newChannel);
+      }, 400);
     });
   }
 

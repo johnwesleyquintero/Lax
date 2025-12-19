@@ -48,13 +48,17 @@ const App: React.FC = () => {
     };
 
     loadMetadata();
-    // In a real app, we might poll this too, but less frequently
   }, [currentUser, currentChannelId]);
 
   const handleLogout = () => {
     localStorage.removeItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER);
     setCurrentUser(null);
     setCurrentChannelId('');
+  };
+
+  const handleChannelCreated = (newChannel: Channel) => {
+    setChannels(prev => [...prev, newChannel]);
+    setCurrentChannelId(newChannel.channel_id);
   };
 
   if (loadingInitial) {
@@ -76,6 +80,7 @@ const App: React.FC = () => {
         currentUser={currentUser}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
+        onChannelCreated={handleChannelCreated}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-white">
