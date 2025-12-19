@@ -36,32 +36,77 @@ To make this a real, multi-user chat app, you need to deploy the Google Apps Scr
 
 ### 1. Database Setup
 1.  Create a new **Google Sheet**.
-2.  Create 4 tabs (sheets) at the bottom with the exact following names and header rows (row 1):
-    *   **Sheet Name**: `Users`
-        *   Headers: `user_id`, `email`, `display_name`, `role`, `created_at`, `last_active`, `status`, `job_title`
-    *   **Sheet Name**: `Channels`
-        *   Headers: `channel_id`, `channel_name`, `is_private`, `created_by`, `created_at`, `type`
-    *   **Sheet Name**: `ChannelMembers`
-        *   Headers: `channel_id`, `user_id`, `joined_at`
-    *   **Sheet Name**: `Messages`
-        *   Headers: `message_id`, `channel_id`, `user_id`, `content`, `created_at`
-3.  **Seed Data**: 
-    *   In `Channels`: `c_general` | `general` | `FALSE` | `admin` | `2024-01-01T00:00:00.000Z` | `channel`
-    *   *Note: When you log in for the first time, the script will automatically add you to `c_general`.*
+2.  Go to **Extensions > Apps Script**.
+3.  Delete any code in `Code.gs` and paste the code block below.
+4.  **Run Setup**:
+    *   In the toolbar, select `setup` from the dropdown function list.
+    *   Click **Run**.
+    *   Grant permissions.
+    *   *This will automatically create the Users, Channels, ChannelMembers, and Messages sheets with the correct columns.*
 
-### 2. Backend API Setup
-1.  In the Google Sheet, go to **Extensions > Apps Script**.
-2.  Delete any code in `Code.gs` and paste the code below.
-3.  **Deploy**:
+### 2. Deploy API
+1.  **Deploy**:
     *   Click **Deploy** > **New deployment**.
     *   Select type: **Web app**.
-    *   Description: `v2`.
+    *   Description: `v1`.
     *   **Execute as**: **Me** (your email).
     *   **Who has access**: **Anyone** (Important for CORS).
     *   Click **Deploy** and copy the **Web App URL**.
 
 #### `Code.gs` Payload
 ```javascript
+/**
+ * 🛠️ SETUP FUNCTION
+ * Run this ONCE to automatically create the database schema.
+ */
+function setup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Users Sheet
+  ensureSheet(ss, 'Users', [
+    'user_id', 'email', 'display_name', 'role', 'created_at', 'last_active', 'status', 'job_title'
+  ]);
+
+  // 2. Channels Sheet
+  const chSheet = ensureSheet(ss, 'Channels', [
+    'channel_id', 'channel_name', 'is_private', 'created_by', 'created_at', 'type'
+  ]);
+  // Seed General Channel if empty
+  if (chSheet.getLastRow() === 1) {
+     chSheet.appendRow(['c_general', 'general', false, 'system', new Date().toISOString(), 'channel']);
+  }
+
+  // 3. ChannelMembers Sheet
+  ensureSheet(ss, 'ChannelMembers', [
+    'channel_id', 'user_id', 'joined_at'
+  ]);
+
+  // 4. Messages Sheet
+  ensureSheet(ss, 'Messages', [
+    'message_id', 'channel_id', 'user_id', 'content', 'created_at'
+  ]);
+}
+
+/**
+ * Helper to create sheet if missing
+ */
+function ensureSheet(ss, name, headers) {
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+    // Optional: Protect headers
+    const range = sheet.getRange(1, 1, 1, headers.length);
+    range.setFontWeight("bold");
+    range.setBackground("#f3f4f6");
+  }
+  return sheet;
+}
+
+/**
+ * 🌐 API HANDLER
+ */
 function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.tryLock(10000);
@@ -77,7 +122,6 @@ function doPost(e) {
     // --- CHANNELS & MEMBERSHIP ---
 
     if (action === 'getChannels') {
-      // Return only channels user is a member of
       const members = getSheetData(ss.getSheetByName('ChannelMembers'));
       const myChannelIds = new Set(members.filter(m => m.user_id === payload.userId).map(m => m.channel_id));
       
@@ -85,22 +129,18 @@ function doPost(e) {
       result = allChannels.filter(c => myChannelIds.has(c.channel_id));
     } 
     else if (action === 'getBrowsableChannels') {
-      // Return Public channels user is NOT a member of AND exclude DMs
       const members = getSheetData(ss.getSheetByName('ChannelMembers'));
       const myChannelIds = new Set(members.filter(m => m.user_id === payload.userId).map(m => m.channel_id));
 
       const allChannels = getSheetData(ss.getSheetByName('Channels'));
-      // Filter out Private, Existing Memberships, and DMs
       result = allChannels.filter(c => c.is_private === false && c.type !== 'dm' && !myChannelIds.has(c.channel_id));
     }
     else if (action === 'joinChannel') {
       const sheet = ss.getSheetByName('ChannelMembers');
       const members = getSheetData(sheet);
-      // Check if already member
       const exists = members.some(m => m.channel_id === payload.channelId && m.user_id === payload.userId);
       
       if (!exists) {
-        // Verify channel exists first
         const channels = getSheetData(ss.getSheetByName('Channels'));
         const channel = channels.find(c => c.channel_id === payload.channelId);
         if (channel) {
@@ -128,7 +168,6 @@ function doPost(e) {
       ];
       cSheet.appendRow(newChannelRow);
       
-      // Auto-join creator
       const mSheet = ss.getSheetByName('ChannelMembers');
       mSheet.appendRow([newId, payload.creatorId, new Date().toISOString()]);
 
@@ -138,7 +177,7 @@ function doPost(e) {
       const cSheet = ss.getSheetByName('Channels');
       const allChannels = getSheetData(cSheet);
       
-      // payload.name should be deterministic: dm_uidA_uidB
+      // Check for existing DM
       const existing = allChannels.find(c => c.channel_name === payload.name && c.type === 'dm');
       
       if (existing) {
@@ -168,7 +207,6 @@ function doPost(e) {
 
     else if (action === 'getMessages') {
       const allMsgs = getSheetData(ss.getSheetByName('Messages'));
-      // Performance: Filter in memory. For huge scale, use Sheets Query/Filter views.
       result = allMsgs.filter(r => r.channel_id === payload.channelId);
     } 
     else if (action === 'sendMessage') {
@@ -220,6 +258,9 @@ function doPost(e) {
         result = zipRow(sheet, newRow);
       }
     }
+    else {
+      throw new Error("Unknown action: " + action);
+    }
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', data: result }))
@@ -232,6 +273,10 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("System Operational. Endpoint Active.");
 }
 
 function getSheetData(sheet) {
