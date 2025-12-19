@@ -122,7 +122,39 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       }
   };
 
-  const isCreator = currentUser.user_id === channel.created_by || currentUser.role === 'admin';
+  // --- Display Name Logic ---
+  const getChannelDisplayInfo = () => {
+      if (channel.type === 'dm') {
+          // Parse dm_userA_userB
+          const parts = channel.channel_name.split('_');
+          // Find the ID that isn't mine
+          const otherId = parts.filter(p => p !== 'dm' && p !== currentUser.user_id)[0];
+          const otherUser = users.find(u => u.user_id === otherId);
+          
+          if (otherUser) {
+              return { 
+                  displayName: otherUser.display_name, 
+                  isDM: true,
+                  icon: (
+                    <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold mr-1">
+                        {otherUser.display_name[0]}
+                    </div>
+                  )
+              };
+          }
+          return { displayName: 'Unknown Operator', isDM: true, icon: <span className="mr-1">@</span> };
+      }
+      
+      // Regular Channel
+      return { 
+          displayName: channel.channel_name, 
+          isDM: false, 
+          icon: <span className="text-gray-400 mr-1 text-lg">#</span>
+      };
+  };
+
+  const { displayName, isDM, icon } = getChannelDisplayInfo();
+  const isCreator = !isDM && (currentUser.user_id === channel.created_by || currentUser.role === 'admin');
 
   return (
     <div className="flex flex-col h-full bg-white relative">
@@ -130,8 +162,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 bg-white flex-shrink-0 relative z-20">
         <div className="flex flex-col">
             <div className="flex items-center gap-1 font-bold text-gray-800 cursor-pointer hover:bg-gray-50 rounded px-1 -ml-1 transition-colors" onClick={() => isCreator && setShowChannelSettings(!showChannelSettings)}>
-                <span className="text-gray-400">#</span>
-                {channel.channel_name}
+                {icon}
+                {displayName}
                 {isCreator && (
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-400 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -139,7 +171,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                 )}
             </div>
             <span className="text-xs text-gray-500">
-                {channel.is_private ? 'Private Group' : 'Public Channel'}
+                {isDM ? 'Direct Message' : (channel.is_private ? 'Private Group' : 'Public Channel')}
             </span>
         </div>
 
@@ -189,12 +221,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
             {/* Intro to Channel */}
             <div className="mb-8 mt-4 px-4">
                 <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
-                    <span className="text-xl text-gray-400 font-bold">#</span>
+                    {isDM ? (
+                        <span className="text-xl text-gray-400 font-bold">@</span>
+                    ) : (
+                        <span className="text-xl text-gray-400 font-bold">#</span>
+                    )}
                 </div>
-                <h1 className="font-bold text-2xl text-gray-900">Welcome to #{channel.channel_name}!</h1>
+                <h1 className="font-bold text-2xl text-gray-900">
+                    {isDM ? displayName : `Welcome to #${displayName}!`}
+                </h1>
                 <p className="text-gray-600 mt-1">
-                    This is the start of the <span className="font-bold">#{channel.channel_name}</span> channel.
-                    {channel.is_private ? ' This is a private space.' : ' This channel is open to the team.'}
+                    {isDM 
+                        ? `This is the start of your private conversation with ${displayName}.`
+                        : `This is the start of the #${displayName} channel.`
+                    }
+                    {!isDM && (channel.is_private ? ' This is a private space.' : ' This channel is open to the team.')}
                 </p>
             </div>
 
@@ -229,7 +270,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       <div className="flex-shrink-0 z-10">
         <MessageInput 
             onSendMessage={handleSendMessage} 
-            channelName={channel.channel_name}
+            channelName={isDM ? displayName : channel.channel_name}
             disabled={isSending}
             users={users}
         />
