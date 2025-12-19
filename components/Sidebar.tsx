@@ -48,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </svg>
         </div>
         <div>
-          <h1 className="text-white font-bold text-lg leading-tight truncate">Lax HQ</h1>
+          <h1 className="text-white font-bold text-lg leading-tight truncate">Lax</h1>
           <button 
              onClick={() => onUserClick(currentUser)}
              className="flex items-center text-xs opacity-70 hover:opacity-100 transition-opacity"
