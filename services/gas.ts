@@ -49,6 +49,11 @@ class GasService {
     return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId, type: 'channel' });
   }
 
+  public async updateChannel(channelId: string, name: string, isPrivate: boolean): Promise<Channel> {
+    if (this.useMock) return this.mockUpdateChannel(channelId, name, isPrivate);
+    return this.fetchGas<Channel>('updateChannel', { channelId, name, isPrivate });
+  }
+
   public async deleteChannel(channelId: string): Promise<void> {
     if (this.useMock) return this.mockDeleteChannel(channelId);
     return this.fetchGas<void>('deleteChannel', { channelId });
@@ -259,6 +264,26 @@ class GasService {
         resolve(newChannel);
       }, 400);
     });
+  }
+
+  private mockUpdateChannel(channelId: string, name: string, isPrivate: boolean): Promise<Channel> {
+      return new Promise((resolve, reject) => {
+          setTimeout(() => {
+              const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+              const index = channels.findIndex(c => c.channel_id === channelId);
+              
+              if (index === -1) {
+                  reject("Channel not found");
+                  return;
+              }
+
+              const slug = name.toLowerCase().replace(/[^a-z0-9_]/g, '-');
+              channels[index] = { ...channels[index], channel_name: slug, is_private: isPrivate };
+              
+              localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
+              resolve(channels[index]);
+          }, 400);
+      });
   }
 
   private mockDeleteChannel(channelId: string): Promise<void> {

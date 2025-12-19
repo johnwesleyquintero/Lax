@@ -172,6 +172,32 @@ function doPost(e) {
 
       result = zipRow(cSheet, newChannelRow);
     }
+    else if (action === 'updateChannel') {
+      const sheet = ss.getSheetByName('Channels');
+      const data = sheet.getDataRange().getValues();
+      const slug = payload.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      let found = false;
+
+      // Skip header, find row by ID (col 0)
+      for(let i=1; i<data.length; i++) {
+          if (data[i][0] === payload.channelId) {
+              // Update Name (col index 1)
+              sheet.getRange(i+1, 2).setValue(slug);
+              // Update IsPrivate (col index 2)
+              sheet.getRange(i+1, 3).setValue(payload.isPrivate);
+              
+              // Construct return object based on existing + updates
+              result = {
+                  ...zipRow(sheet, data[i]),
+                  channel_name: slug,
+                  is_private: payload.isPrivate
+              };
+              found = true;
+              break;
+          }
+      }
+      if (!found) throw new Error("Channel not found");
+    }
     else if (action === 'deleteChannel') {
         // Simple implementation: delete the row from Channels.
         // In a real app, you'd cascade delete messages or mark as deleted.
@@ -335,17 +361,3 @@ function zipRow(sheet, rowArray) {
   return obj;
 }
 ```
-
-### 3. Connect Frontend
-1.  In the Lax app, log in.
-2.  Click **Config** (bottom left sidebar).
-3.  Uncheck "Use Demo Mode".
-4.  Paste your **Web App URL**.
-5.  Save & Reload.
-
-## 🛠 Tech Stack
-
-*   **Frontend**: React 18, TypeScript, Tailwind CSS
-*   **State**: Local State (minimal complexity)
-*   **Backend**: Google Apps Script
-*   **Database**: Google Sheets

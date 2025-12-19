@@ -4,6 +4,7 @@ import { APP_CONFIG } from '../constants';
 import { api } from '../services/gas';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
+import EditChannelModal from './EditChannelModal';
 
 interface ChatWindowProps {
   channel: Channel;
@@ -11,13 +12,15 @@ interface ChatWindowProps {
   users: User[];
   onUserClick: (user: User) => void;
   onChannelDeleted: () => void;
+  onChannelUpdated: (channel: Channel) => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick, onChannelDeleted }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick, onChannelDeleted, onChannelUpdated }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [showChannelSettings, setShowChannelSettings] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create a map for fast user lookups
@@ -185,6 +188,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                     Channel Settings
                 </div>
                 <button 
+                    onClick={() => { setShowChannelSettings(false); setIsEditModalOpen(true); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Edit Channel
+                </button>
+                <button 
                     onClick={handleDeleteChannel}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                 >
@@ -278,6 +290,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
             users={users}
         />
       </div>
+
+      {isEditModalOpen && (
+        <EditChannelModal 
+          channel={channel}
+          onClose={() => setIsEditModalOpen(false)}
+          onUpdated={onChannelUpdated}
+        />
+      )}
     </div>
   );
 };

@@ -76,10 +76,16 @@ const App: React.FC = () => {
              setCurrentChannelId(newChannel.channel_id);
         });
     } else {
-        // Optimistic add for create
+        // Optimistic add for create or update
         setChannels(prev => {
-            // Prevent duplicates
-            if (prev.find(c => c.channel_id === newChannel.channel_id)) return prev;
+            const index = prev.findIndex(c => c.channel_id === newChannel.channel_id);
+            if (index !== -1) {
+                // Update
+                const newArr = [...prev];
+                newArr[index] = newChannel;
+                return newArr;
+            }
+            // Add
             return [...prev, newChannel];
         });
         setCurrentChannelId(newChannel.channel_id);
@@ -126,6 +132,7 @@ const App: React.FC = () => {
                 users={users}
                 onUserClick={setSelectedUser}
                 onChannelDeleted={handleChannelDeleted}
+                onChannelUpdated={handleChannelAction}
             />
         ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
