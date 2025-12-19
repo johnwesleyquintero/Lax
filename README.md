@@ -19,6 +19,9 @@ No servers. No database bills. Just Google infrastructure.
 [ Google Sheets DB ]
 ```
 
+<img width="1136" height="888" alt="image" src="https://github.com/user-attachments/assets/2f6942eb-1c19-4cba-afd3-bdd1fc21bd54" />
+
+
 ## 🚀 Quick Start (Demo Mode)
 
 By default, the application runs in **Mock Mode**. This means it uses your browser's `localStorage` to simulate a backend.
