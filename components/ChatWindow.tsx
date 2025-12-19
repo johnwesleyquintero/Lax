@@ -10,13 +10,14 @@ interface ChatWindowProps {
   currentUser: User;
   users: User[];
   onUserClick: (user: User) => void;
+  onChannelDeleted: () => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick, onChannelDeleted }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showChannelSettings, setShowChannelSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create a map for fast user lookups
@@ -37,10 +38,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
 
     const fetchMessages = async () => {
       try {
-        // Optimization: In a real app, we would pass the last timestamp we have
-        // const lastTs = messages.length > 0 ? messages[messages.length - 1].created_at : undefined;
-        // For simplicity in this demo, we fetch all for the channel to handle "edits" (if we supported them) or deletions implicitly by full replace
-        // But for true Append-Only as requested, we should merge.
         const msgs = await api.getMessages(channel.channel_id);
         
         if (isMounted) {
@@ -85,10 +82,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
         setMessages(prev => [...prev, tempMsg]);
 
         await api.sendMessage(channel.channel_id, currentUser.user_id, content);
-        
-        // The poll will pick up the real message eventually and replace the temp one
-        // In a more complex app we'd handle the ID swap. 
-        // For now, the optimistic push makes it feel instant.
     } catch (error) {
         console.error("Failed to send", error);
         alert("Failed to send message. Check console.");
@@ -97,19 +90,81 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     }
   };
 
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+      // Optimistic
+      setMessages(prev => prev.map(m => m.message_id === messageId ? { ...m, content: newContent } : m));
+      try {
+          await api.editMessage(messageId, newContent);
+      } catch (e) {
+          console.error("Failed to edit", e);
+      }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+      // Optimistic
+      setMessages(prev => prev.filter(m => m.message_id !== messageId));
+      try {
+          await api.deleteMessage(messageId);
+      } catch (e) {
+          console.error("Failed to delete", e);
+      }
+  };
+
+  const handleDeleteChannel = async () => {
+      if (confirm(`Are you sure you want to delete #${channel.channel_name}? This cannot be undone.`)) {
+          try {
+              await api.deleteChannel(channel.channel_id);
+              onChannelDeleted();
+          } catch (e) {
+              alert("Failed to delete channel");
+              console.error(e);
+          }
+      }
+  };
+
+  const isCreator = currentUser.user_id === channel.created_by || currentUser.role === 'admin';
+
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
-      <div className="h-14 border-b border-gray-200 flex items-center justify-center sm:justify-between px-4 bg-white flex-shrink-0">
-        <div className="flex flex-col items-center sm:items-start">
-            <div className="flex items-center gap-1 font-bold text-gray-800">
+      <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 bg-white flex-shrink-0 relative z-20">
+        <div className="flex flex-col">
+            <div className="flex items-center gap-1 font-bold text-gray-800 cursor-pointer hover:bg-gray-50 rounded px-1 -ml-1 transition-colors" onClick={() => isCreator && setShowChannelSettings(!showChannelSettings)}>
                 <span className="text-gray-400">#</span>
                 {channel.channel_name}
+                {isCreator && (
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-400 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                     </svg>
+                )}
             </div>
             <span className="text-xs text-gray-500">
                 {channel.is_private ? 'Private Group' : 'Public Channel'}
             </span>
         </div>
+
+        {/* Channel Settings Dropdown */}
+        {showChannelSettings && isCreator && (
+            <div className="absolute top-12 left-4 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
+                    Channel Settings
+                </div>
+                <button 
+                    onClick={handleDeleteChannel}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Channel
+                </button>
+            </div>
+        )}
+
+        {/* Click outside listener for dropdown */}
+        {showChannelSettings && <div className="fixed inset-0 z-[-1]" onClick={() => setShowChannelSettings(false)}></div>}
+
+
         <div className="hidden sm:flex items-center -space-x-2 overflow-hidden">
              {/* Mock avatars of channel members - Random subset for visual flair */}
              {users.slice(0,3).map((u, i) => (
@@ -159,6 +214,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                   user={user} 
                   isSequential={isSequential}
                   onUserClick={onUserClick}
+                  currentUser={currentUser}
+                  onEdit={handleEditMessage}
+                  onDelete={handleDeleteMessage}
                 />
               );
             })}

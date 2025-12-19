@@ -86,6 +86,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleChannelDeleted = () => {
+      refreshChannels().then(() => {
+          // Reset to general or empty
+          const general = channels.find(c => c.channel_name === 'general');
+          setCurrentChannelId(general ? general.channel_id : '');
+      });
+  };
+
   if (loadingInitial) {
     return <div className="h-screen w-screen flex items-center justify-center bg-gray-50 text-gray-400">Initializing...</div>;
   }
@@ -117,6 +125,7 @@ const App: React.FC = () => {
                 currentUser={currentUser}
                 users={users}
                 onUserClick={setSelectedUser}
+                onChannelDeleted={handleChannelDeleted}
             />
         ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">

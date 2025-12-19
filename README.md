@@ -47,8 +47,7 @@ To make this a real, multi-user chat app, you need to deploy the Google Apps Scr
 ### 2. Deploy API
 1.  **Deploy**:
     *   Click **Deploy** > **New deployment**.
-    *   Select type: **Web app**.
-    *   Description: `v1`.
+    *   Description: `v2 - edit delete`.
     *   **Execute as**: **Me** (your email).
     *   **Who has access**: **Anyone** (Important for CORS).
     *   Click **Deploy** and copy the **Web App URL**.
@@ -173,6 +172,19 @@ function doPost(e) {
 
       result = zipRow(cSheet, newChannelRow);
     }
+    else if (action === 'deleteChannel') {
+        // Simple implementation: delete the row from Channels.
+        // In a real app, you'd cascade delete messages or mark as deleted.
+        const sheet = ss.getSheetByName('Channels');
+        const data = sheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+            if (data[i][0] === payload.channelId) {
+                sheet.deleteRow(i + 1);
+                break;
+            }
+        }
+        result = { success: true };
+    }
     else if (action === 'createDM') {
       const cSheet = ss.getSheetByName('Channels');
       const allChannels = getSheetData(cSheet);
@@ -220,6 +232,30 @@ function doPost(e) {
       ];
       sheet.appendRow(newRow);
       result = zipRow(sheet, newRow);
+    }
+    else if (action === 'editMessage') {
+        const sheet = ss.getSheetByName('Messages');
+        const data = sheet.getDataRange().getValues();
+        // find row by message_id (col 0)
+        for(let i=1; i<data.length; i++) {
+            if (data[i][0] === payload.messageId) {
+                // Update content column (index 3 based on setup headers)
+                sheet.getRange(i+1, 4).setValue(payload.content);
+                break;
+            }
+        }
+        result = { success: true };
+    }
+    else if (action === 'deleteMessage') {
+        const sheet = ss.getSheetByName('Messages');
+        const data = sheet.getDataRange().getValues();
+        for(let i=1; i<data.length; i++) {
+            if (data[i][0] === payload.messageId) {
+                sheet.deleteRow(i+1);
+                break;
+            }
+        }
+        result = { success: true };
     }
 
     // --- USERS ---

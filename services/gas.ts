@@ -49,6 +49,11 @@ class GasService {
     return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId, type: 'channel' });
   }
 
+  public async deleteChannel(channelId: string): Promise<void> {
+    if (this.useMock) return this.mockDeleteChannel(channelId);
+    return this.fetchGas<void>('deleteChannel', { channelId });
+  }
+
   public async createDM(targetUserId: string, currentUserId: string): Promise<Channel> {
     // Generate deterministic DM name: dm_userA_userB (sorted)
     const sortedIds = [targetUserId, currentUserId].sort();
@@ -71,6 +76,16 @@ class GasService {
   public async sendMessage(channelId: string, userId: string, content: string): Promise<Message> {
     if (this.useMock) return this.mockSendMessage(channelId, userId, content);
     return this.fetchGas<Message>('sendMessage', { channelId, userId, message: content });
+  }
+
+  public async editMessage(messageId: string, content: string): Promise<void> {
+    if (this.useMock) return this.mockEditMessage(messageId, content);
+    return this.fetchGas<void>('editMessage', { messageId, content });
+  }
+
+  public async deleteMessage(messageId: string): Promise<void> {
+    if (this.useMock) return this.mockDeleteMessage(messageId);
+    return this.fetchGas<void>('deleteMessage', { messageId });
   }
 
   public async getUsers(): Promise<User[]> {
@@ -246,6 +261,23 @@ class GasService {
     });
   }
 
+  private mockDeleteChannel(channelId: string): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            let channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+            channels = channels.filter(c => c.channel_id !== channelId);
+            localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
+            
+            // Clean up members (optional for mock, but good for hygiene)
+            let members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+            members = members.filter(m => m.channel_id !== channelId);
+            localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
+
+            resolve();
+        }, 400);
+    });
+  }
+
   private mockCreateDM(name: string, currentUserId: string, targetUserId: string): Promise<Channel> {
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -311,6 +343,31 @@ class GasService {
         localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify(allMessages));
         resolve(newMessage);
       }, 200);
+    });
+  }
+
+  private mockEditMessage(messageId: string, content: string): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const allMessages: Message[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES) || '[]');
+            const index = allMessages.findIndex(m => m.message_id === messageId);
+            if (index !== -1) {
+                allMessages[index].content = content;
+                localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify(allMessages));
+            }
+            resolve();
+        }, 200);
+    });
+  }
+
+  private mockDeleteMessage(messageId: string): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            let allMessages: Message[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES) || '[]');
+            allMessages = allMessages.filter(m => m.message_id !== messageId);
+            localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify(allMessages));
+            resolve();
+        }, 200);
     });
   }
 
