@@ -99,8 +99,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) 
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
-      <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 bg-white flex-shrink-0">
-        <div className="flex flex-col">
+      <div className="h-14 border-b border-gray-200 flex items-center justify-center sm:justify-between px-4 bg-white flex-shrink-0">
+        <div className="flex flex-col items-center sm:items-start">
             <div className="flex items-center gap-1 font-bold text-gray-800">
                 <span className="text-gray-400">#</span>
                 {channel.channel_name}
@@ -109,7 +109,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) 
                 {channel.is_private ? 'Private Group' : 'Public Channel'}
             </span>
         </div>
-        <div className="flex items-center -space-x-2 overflow-hidden">
+        <div className="hidden sm:flex items-center -space-x-2 overflow-hidden">
              {/* Mock avatars of channel members */}
              <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-300" />
              <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-400" />
@@ -169,6 +169,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) 
             onSendMessage={handleSendMessage} 
             channelName={channel.channel_name}
             disabled={isSending}
+            users={users}
         />
       </div>
     </div>

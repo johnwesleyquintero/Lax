@@ -11,8 +11,7 @@ interface MessageBubbleProps {
 const formatContent = (text: string) => {
   if (!text) return null;
 
-  // 1. Split by Code Blocks (`code`) - highest precedence, no nested formatting inside
-  // Regex captures the delimiter and content: (`...`)
+  // 1. Split by Code Blocks (`code`) - highest precedence
   const codeParts = text.split(/(`[^`]+`)/g);
 
   return codeParts.map((part, index) => {
@@ -25,30 +24,44 @@ const formatContent = (text: string) => {
       );
     }
 
-    // 2. Parse Bold (*text*)
-    const boldParts = part.split(/(\*[^*]+\*)/g);
+    // 2. Parse Mentions (@Username) - Second precedence
+    // We assume mentions are @ followed by alphanumeric/underscore/dash, and usually end with space or punctuation
+    const mentionParts = part.split(/(@[a-zA-Z0-9_\-]+)/g);
+    
     return (
-      <span key={`p-${index}`}>
-        {boldParts.map((bPart, bIndex) => {
-          if (bPart.startsWith('*') && bPart.endsWith('*') && bPart.length > 1) {
-            // Content inside bold
-            const content = bPart.slice(1, -1);
-            // 3. Parse Italic inside Bold (_text_)
-            return (
-               <strong key={`b-${index}-${bIndex}`} className="font-semibold text-gray-900">
-                  {parseItalicAndStrike(content, `b-${index}-${bIndex}`)}
-               </strong>
-            );
-          }
-          // Not bold, parse Italic/Strike directly
-          return parseItalicAndStrike(bPart, `t-${index}-${bIndex}`);
+      <span key={`m-group-${index}`}>
+        {mentionParts.map((mPart, mIndex) => {
+            if (mPart.startsWith('@') && mPart.length > 1) {
+                return (
+                    <span key={`m-${index}-${mIndex}`} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium mx-0.5 cursor-pointer hover:bg-blue-200 transition-colors">
+                        {mPart}
+                    </span>
+                );
+            }
+            
+            // 3. Parse Bold inside non-mention text
+            return parseBold(mPart, `b-${index}-${mIndex}`);
         })}
       </span>
     );
   });
 };
 
-// Helper for Italic and Strike recursion
+const parseBold = (text: string, keyPrefix: string) => {
+    const boldParts = text.split(/(\*[^*]+\*)/g);
+    return boldParts.map((bPart, bIndex) => {
+        if (bPart.startsWith('*') && bPart.endsWith('*') && bPart.length > 1) {
+            const content = bPart.slice(1, -1);
+            return (
+                <strong key={`${keyPrefix}-b-${bIndex}`} className="font-semibold text-gray-900">
+                    {parseItalicAndStrike(content, `${keyPrefix}-b-${bIndex}`)}
+                </strong>
+            );
+        }
+        return parseItalicAndStrike(bPart, `${keyPrefix}-t-${bIndex}`);
+    });
+};
+
 const parseItalicAndStrike = (text: string, keyPrefix: string) => {
    const iParts = text.split(/(_[^_]+_)/g);
    return iParts.map((iPart, iIndex) => {
