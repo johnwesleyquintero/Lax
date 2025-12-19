@@ -40,7 +40,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [isCollapsed]);
 
   // Group Channels
-  const groupChannels = channels.filter(c => !c.type || c.type === 'channel');
+  // Filter: Must be (type=channel OR undefined) AND Name must NOT start with 'dm_'
+  const groupChannels = channels.filter(c => 
+    (!c.type || c.type === 'channel') && !c.channel_name.startsWith('dm_')
+  );
 
   // Filter Logic for Groups
   const filteredGroupChannels = groupChannels.filter(c => 

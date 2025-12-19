@@ -124,12 +124,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
 
   // --- Display Name Logic ---
   const getChannelDisplayInfo = () => {
-      if (channel.type === 'dm') {
-          // Parse dm_userA_userB
-          const parts = channel.channel_name.split('_');
-          // Find the ID that isn't mine
-          const otherId = parts.filter(p => p !== 'dm' && p !== currentUser.user_id)[0];
-          const otherUser = users.find(u => u.user_id === otherId);
+      // Force DM detection if name starts with dm_ (Legacy Support)
+      const isDM = channel.type === 'dm' || channel.channel_name.startsWith('dm_');
+
+      if (isDM) {
+          // Robust lookup: Find user inside the string
+          const otherUser = users.find(u => 
+              channel.channel_name.includes(u.user_id) && 
+              u.user_id !== currentUser.user_id
+          );
           
           if (otherUser) {
               return { 
@@ -137,7 +140,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                   isDM: true,
                   icon: (
                     <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold mr-1">
-                        {otherUser.display_name[0]}
+                        {otherUser.display_name[0].toUpperCase()}
                     </div>
                   )
               };

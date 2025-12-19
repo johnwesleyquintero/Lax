@@ -27,23 +27,28 @@ const DirectMessageList: React.FC<DirectMessageListProps> = ({
 
   // Helper to resolve DM metadata
   const getDMInfo = (channel: Channel) => {
-    // DM naming convention: dm_uidA_uidB
-    const parts = channel.channel_name.split('_');
-    // Filter out 'dm' and my own ID
-    const otherId = parts.filter(p => p !== 'dm' && p !== currentUser.user_id)[0];
+    // Robust Strategy: Don't split strings. Look for the user ID inside the string.
+    // The string format is 'dm_userA_userB' or similar.
+    // We just need to find a user in the user list whose ID exists in this string 
+    // AND is not the current user.
     
-    // If found, look up user
-    if (otherId) {
-        const otherUser = users.find(u => u.user_id === otherId);
-        if (otherUser) {
-            return { name: otherUser.display_name, avatar: otherUser.display_name[0], user: otherUser };
-        }
+    const otherUser = users.find(u => 
+        channel.channel_name.includes(u.user_id) && 
+        u.user_id !== currentUser.user_id
+    );
+
+    if (otherUser) {
+        return { name: otherUser.display_name, avatar: otherUser.display_name[0].toUpperCase(), user: otherUser };
     }
-    return { name: 'Unknown', avatar: '?', user: null };
+    
+    return { name: 'Unknown Operator', avatar: '?', user: null };
   };
 
-  // Filter channels to only DMs
-  const dmChannels = channels.filter(c => c.type === 'dm');
+  // Filter channels to only DMs (type='dm' OR startsWith('dm_'))
+  // This catches legacy channels created before 'type' was added
+  const dmChannels = channels.filter(c => 
+    c.type === 'dm' || c.channel_name.startsWith('dm_')
+  );
 
   // Filter by search query
   const filteredDMs = dmChannels.filter(c => {
