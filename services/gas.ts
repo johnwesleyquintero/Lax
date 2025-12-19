@@ -108,7 +108,12 @@ class GasService {
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify([]));
     }
     if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS)) {
-      localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS, JSON.stringify([]));
+      // Seed some dummy users for better demo experience
+      const dummyUsers: User[] = [
+        { user_id: 'u_sys_1', email: 'admin@lax.hq', display_name: 'System', role: 'admin', created_at: new Date().toISOString(), last_active: new Date().toISOString(), job_title: 'Bot', status: 'Monitoring uplink...' },
+        { user_id: 'u_demo_1', email: 'viper@topgun.nav', display_name: 'Viper', role: 'member', created_at: new Date().toISOString(), last_active: new Date().toISOString(), job_title: 'Instructor', status: 'In the tower.' },
+      ];
+      localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS, JSON.stringify(dummyUsers));
     }
   }
 
@@ -196,7 +201,9 @@ class GasService {
         display_name: displayName,
         role: 'member',
         created_at: new Date().toISOString(),
-        last_active: new Date().toISOString()
+        last_active: new Date().toISOString(),
+        status: 'Online',
+        job_title: 'Operator'
       };
       users.push(newUser);
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS, JSON.stringify(users));

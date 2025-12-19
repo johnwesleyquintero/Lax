@@ -5,6 +5,8 @@ export interface User {
   role: 'admin' | 'member';
   created_at: string;
   last_active: string;
+  status?: string;
+  job_title?: string;
 }
 
 export interface Channel {

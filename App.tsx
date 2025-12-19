@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import LoginScreen from './components/LoginScreen';
 import SettingsModal from './components/SettingsModal';
+import UserProfileModal from './components/UserProfileModal';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -14,6 +15,7 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
   // Restore session
@@ -81,6 +83,7 @@ const App: React.FC = () => {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
         onChannelCreated={handleChannelCreated}
+        onUserClick={setSelectedUser}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-white">
@@ -89,6 +92,7 @@ const App: React.FC = () => {
                 channel={currentChannel}
                 currentUser={currentUser}
                 users={users}
+                onUserClick={setSelectedUser}
             />
         ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
@@ -99,6 +103,14 @@ const App: React.FC = () => {
 
       {isSettingsOpen && (
         <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+      )}
+
+      {selectedUser && (
+        <UserProfileModal 
+          user={selectedUser} 
+          currentUser={currentUser}
+          onClose={() => setSelectedUser(null)} 
+        />
       )}
     </div>
   );

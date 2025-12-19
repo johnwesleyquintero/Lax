@@ -9,9 +9,10 @@ interface ChatWindowProps {
   channel: Channel;
   currentUser: User;
   users: User[];
+  onUserClick: (user: User) => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -110,11 +111,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) 
             </span>
         </div>
         <div className="hidden sm:flex items-center -space-x-2 overflow-hidden">
-             {/* Mock avatars of channel members */}
-             <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-300" />
-             <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-400" />
-             <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-500" />
-             <span className="ml-4 text-xs text-gray-400 pl-2">3 Members</span>
+             {/* Mock avatars of channel members - Random subset for visual flair */}
+             {users.slice(0,3).map((u, i) => (
+                 <div key={u.user_id} className={`inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-300 flex items-center justify-center text-[8px] text-white font-bold bg-slate-400`}>
+                     {u.display_name[0]}
+                 </div>
+             ))}
+             <span className="ml-4 text-xs text-gray-400 pl-2">{users.length} Operators</span>
         </div>
       </div>
 
@@ -154,7 +157,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users }) 
                   key={msg.message_id} 
                   message={msg} 
                   user={user} 
-                  isSequential={isSequential} 
+                  isSequential={isSequential}
+                  onUserClick={onUserClick}
                 />
               );
             })}

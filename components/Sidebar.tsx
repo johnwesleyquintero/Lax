@@ -10,6 +10,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onLogout: () => void;
   onChannelCreated: (channel: Channel) => void;
+  onUserClick: (user: User) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -19,7 +20,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onOpenSettings,
   onLogout,
-  onChannelCreated
+  onChannelCreated,
+  onUserClick
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -38,10 +40,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div>
           <h1 className="text-white font-bold text-lg leading-tight truncate">Lax HQ</h1>
-          <div className="flex items-center text-xs opacity-70">
+          <button 
+             onClick={() => onUserClick(currentUser)}
+             className="flex items-center text-xs opacity-70 hover:opacity-100 transition-opacity"
+          >
              <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
-             <span className="group-hover:text-white transition-colors truncate max-w-[120px]">{currentUser.display_name}</span>
-          </div>
+             <span className="truncate max-w-[120px]">{currentUser.display_name}</span>
+          </button>
         </div>
       </div>
 

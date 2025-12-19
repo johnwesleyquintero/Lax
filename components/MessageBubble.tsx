@@ -5,6 +5,7 @@ interface MessageBubbleProps {
   message: Message;
   user?: User;
   isSequential: boolean;
+  onUserClick: (user: User) => void;
 }
 
 // Simple Markdown Parser for React
@@ -25,7 +26,6 @@ const formatContent = (text: string) => {
     }
 
     // 2. Parse Mentions (@Username) - Second precedence
-    // We assume mentions are @ followed by alphanumeric/underscore/dash, and usually end with space or punctuation
     const mentionParts = part.split(/(@[a-zA-Z0-9_\-]+)/g);
     
     return (
@@ -91,10 +91,8 @@ const parseStrike = (text: string, keyPrefix: string) => {
     });
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequential }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequential, onUserClick }) => {
   const date = new Date(message.created_at);
-  
-  // Format time: "10:45 AM"
   const timeString = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   
   // Deterministic color for avatar background based on user ID
@@ -109,6 +107,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequenti
 
   const displayName = user ? user.display_name : 'Unknown Operator';
   const initial = displayName.charAt(0).toUpperCase();
+
+  const handleUserClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (user) onUserClick(user);
+  };
 
   if (isSequential) {
     return (
@@ -125,12 +128,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequenti
 
   return (
     <div className="group flex items-start px-4 py-2 mt-2 hover:bg-gray-50 -ml-4 pl-4 border-l-4 border-transparent hover:border-gray-200">
-      <div className={`w-9 h-9 rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mr-3 ${getColor(message.user_id)}`}>
+      <button 
+        onClick={handleUserClick}
+        className={`w-9 h-9 rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mr-3 transition-transform hover:scale-105 ${getColor(message.user_id)}`}
+      >
         {initial}
-      </div>
+      </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline mb-0.5">
-          <span className="font-bold text-gray-900 mr-2">{displayName}</span>
+          <button onClick={handleUserClick} className="font-bold text-gray-900 mr-2 hover:underline decoration-gray-400">
+            {displayName}
+          </button>
           <span className="text-xs text-gray-500">{timeString}</span>
         </div>
         <div className="text-gray-800 break-words leading-relaxed">
