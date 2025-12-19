@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Channel, User } from '../types';
 import CreateChannelModal from './CreateChannelModal';
+import JoinChannelModal from './JoinChannelModal';
 
 interface SidebarProps {
   channels: Channel[];
@@ -24,6 +25,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   onUserClick
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+
+  const handleChannelJoined = (channelId: string) => {
+      // Logic for joining is handled in App.tsx via reloading channels, 
+      // but if we need immediate navigation we can use this.
+      // For now, we rely on App.tsx to refresh the channel list.
+      onSelectChannel(channelId); // Optimistically select it
+  };
 
   return (
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full border-r border-slate-800 flex-shrink-0">
@@ -54,15 +63,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto py-4">
         <div className="px-4 mb-2 flex items-center justify-between group">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 group-hover:text-slate-400">Channels</h2>
-          <button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="text-slate-500 hover:text-slate-300 transition-colors p-1 hover:bg-slate-800 rounded" 
-            title="Create Channel"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setIsJoinModalOpen(true)}
+                className="text-slate-500 hover:text-slate-300 transition-colors p-1 hover:bg-slate-800 rounded" 
+                title="Browse Channels"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              <button 
+                onClick={() => setIsCreateModalOpen(true)}
+                className="text-slate-500 hover:text-slate-300 transition-colors p-1 hover:bg-slate-800 rounded" 
+                title="Create Channel"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+          </div>
         </div>
         
         <ul className="space-y-0.5">
@@ -115,6 +135,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClose={() => setIsCreateModalOpen(false)}
           onCreated={onChannelCreated}
           currentUser={currentUser}
+        />
+      )}
+      
+      {isJoinModalOpen && (
+        <JoinChannelModal
+            onClose={() => setIsJoinModalOpen(false)}
+            onJoined={(id) => onChannelCreated({ channel_id: id } as any)} // Hack: Reuse trigger to refresh list
+            currentUser={currentUser}
         />
       )}
     </div>

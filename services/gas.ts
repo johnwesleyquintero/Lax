@@ -34,14 +34,24 @@ class GasService {
 
   // --- Public API Methods ---
 
-  public async getChannels(): Promise<Channel[]> {
-    if (this.useMock) return this.mockGetChannels();
-    return this.fetchGas<Channel[]>('getChannels');
+  public async getChannels(userId: string): Promise<Channel[]> {
+    if (this.useMock) return this.mockGetChannels(userId);
+    return this.fetchGas<Channel[]>('getChannels', { userId });
+  }
+
+  public async getBrowsableChannels(userId: string): Promise<Channel[]> {
+    if (this.useMock) return this.mockGetBrowsableChannels(userId);
+    return this.fetchGas<Channel[]>('getBrowsableChannels', { userId });
   }
 
   public async createChannel(name: string, isPrivate: boolean, creatorId: string): Promise<Channel> {
     if (this.useMock) return this.mockCreateChannel(name, isPrivate, creatorId);
     return this.fetchGas<Channel>('createChannel', { name, isPrivate, creatorId });
+  }
+
+  public async joinChannel(channelId: string, userId: string): Promise<void> {
+    if (this.useMock) return this.mockJoinChannel(channelId, userId);
+    return this.fetchGas<void>('joinChannel', { channelId, userId });
   }
 
   public async getMessages(channelId: string, afterTs?: string): Promise<Message[]> {
@@ -96,6 +106,7 @@ class GasService {
   // --- Mock Implementation (Local Storage) ---
 
   private initMockData() {
+    // 1. Channels
     if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS)) {
       const initialChannels: Channel[] = [
         { channel_id: 'c_general', channel_name: 'general', is_private: false, created_by: 'system', created_at: new Date().toISOString() },
@@ -104,25 +115,92 @@ class GasService {
       ];
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(initialChannels));
     }
-    if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES)) {
-      localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify([]));
-    }
+    
+    // 2. Users
     if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS)) {
-      // Seed some dummy users for better demo experience
       const dummyUsers: User[] = [
         { user_id: 'u_sys_1', email: 'admin@lax.hq', display_name: 'System', role: 'admin', created_at: new Date().toISOString(), last_active: new Date().toISOString(), job_title: 'Bot', status: 'Monitoring uplink...' },
         { user_id: 'u_demo_1', email: 'viper@topgun.nav', display_name: 'Viper', role: 'member', created_at: new Date().toISOString(), last_active: new Date().toISOString(), job_title: 'Instructor', status: 'In the tower.' },
       ];
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS, JSON.stringify(dummyUsers));
     }
+
+    // 3. Channel Members (New)
+    // If not exists, seed it by adding all current users to all current public channels to migrate
+    const MEMBERS_KEY = 'op_chat_channel_members';
+    if (!localStorage.getItem(MEMBERS_KEY)) {
+      const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+      const users: User[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS) || '[]');
+      
+      const members: any[] = [];
+      
+      // Auto-join logic for initial seed
+      channels.forEach(c => {
+        users.forEach(u => {
+             // Add everyone to public channels, add system/admin to private ops
+             if (!c.is_private || c.channel_name === 'operations') {
+                 members.push({ channel_id: c.channel_id, user_id: u.user_id, joined_at: new Date().toISOString() });
+             }
+        });
+      });
+      localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+    }
+
+    if (!localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES)) {
+      localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES, JSON.stringify([]));
+    }
   }
 
-  private mockGetChannels(): Promise<Channel[]> {
+  private mockGetChannels(userId: string): Promise<Channel[]> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const data = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS);
-        resolve(data ? JSON.parse(data) : []);
-      }, 300); // Fake latency
+        const allChannels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+        const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+        
+        // Filter channels where user is a member
+        const myChannelIds = new Set(members.filter((m: any) => m.user_id === userId).map((m: any) => m.channel_id));
+        const myChannels = allChannels.filter(c => myChannelIds.has(c.channel_id));
+        
+        resolve(myChannels);
+      }, 300);
+    });
+  }
+
+  private mockGetBrowsableChannels(userId: string): Promise<Channel[]> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+          const allChannels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+          const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+          
+          const myChannelIds = new Set(members.filter((m: any) => m.user_id === userId).map((m: any) => m.channel_id));
+          
+          // Return Public channels that I am NOT a member of
+          const browsable = allChannels.filter(c => !c.is_private && !myChannelIds.has(c.channel_id));
+          resolve(browsable);
+        }, 300);
+    });
+  }
+
+  private mockJoinChannel(channelId: string, userId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const allChannels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+            const channel = allChannels.find(c => c.channel_id === channelId);
+            
+            if (!channel) {
+                reject("Channel not found");
+                return;
+            }
+
+            const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+            const isMember = members.some((m: any) => m.channel_id === channelId && m.user_id === userId);
+            
+            if (!isMember) {
+                members.push({ channel_id: channelId, user_id: userId, joined_at: new Date().toISOString() });
+                localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
+            }
+            resolve();
+        }, 300);
     });
   }
 
@@ -131,7 +209,6 @@ class GasService {
       setTimeout(() => {
         const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
         
-        // Simple slugify
         const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
         
         const newChannel: Channel = {
@@ -144,6 +221,12 @@ class GasService {
         
         channels.push(newChannel);
         localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
+
+        // Auto-join the creator
+        const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+        members.push({ channel_id: newChannel.channel_id, user_id: creatorId, joined_at: new Date().toISOString() });
+        localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
+
         resolve(newChannel);
       }, 400);
     });
@@ -207,6 +290,17 @@ class GasService {
       };
       users.push(newUser);
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.USERS, JSON.stringify(users));
+
+      // Auto join 'general'
+      const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
+      const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
+      const general = channels.find(c => c.channel_name === 'general');
+      
+      if (general) {
+          members.push({ channel_id: general.channel_id, user_id: newUser.user_id, joined_at: new Date().toISOString() });
+          localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
+      }
+
       resolve(newUser);
     });
   }

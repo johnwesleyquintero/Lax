@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Channel, User } from './types';
 import { APP_CONFIG } from './constants';
 import { api } from './services/gas';
@@ -27,14 +27,11 @@ const App: React.FC = () => {
     setLoadingInitial(false);
   }, []);
 
-  // Fetch Metadata (Channels, Users)
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const loadMetadata = async () => {
+  const loadMetadata = useCallback(async () => {
+      if (!currentUser) return;
       try {
         const [fetchedChannels, fetchedUsers] = await Promise.all([
-            api.getChannels(),
+            api.getChannels(currentUser.user_id),
             api.getUsers()
         ]);
         setChannels(fetchedChannels);
@@ -47,10 +44,12 @@ const App: React.FC = () => {
       } catch (err) {
         console.error("Failed to load metadata", err);
       }
-    };
-
-    loadMetadata();
   }, [currentUser, currentChannelId]);
+
+  // Fetch Metadata (Channels, Users)
+  useEffect(() => {
+    loadMetadata();
+  }, [loadMetadata]);
 
   const handleLogout = () => {
     localStorage.removeItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER);
@@ -58,9 +57,27 @@ const App: React.FC = () => {
     setCurrentChannelId('');
   };
 
-  const handleChannelCreated = (newChannel: Channel) => {
-    setChannels(prev => [...prev, newChannel]);
-    setCurrentChannelId(newChannel.channel_id);
+  // Called when Create or Join happens.
+  // Ideally, JoinChannelModal should pass the full object, but sometimes we just reload.
+  // We reload metadata to be safe and consistent.
+  const refreshChannels = async () => {
+      if (currentUser) {
+          const fetchedChannels = await api.getChannels(currentUser.user_id);
+          setChannels(fetchedChannels);
+      }
+  };
+
+  const handleChannelAction = (newChannel: Channel) => {
+    // If it's a partial object (hack from Sidebar), reload all
+    if (!newChannel.channel_name) {
+        refreshChannels().then(() => {
+             setCurrentChannelId(newChannel.channel_id);
+        });
+    } else {
+        // Optimistic add for create
+        setChannels(prev => [...prev, newChannel]);
+        setCurrentChannelId(newChannel.channel_id);
+    }
   };
 
   if (loadingInitial) {
@@ -82,7 +99,7 @@ const App: React.FC = () => {
         currentUser={currentUser}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
-        onChannelCreated={handleChannelCreated}
+        onChannelCreated={handleChannelAction}
         onUserClick={setSelectedUser}
       />
       
@@ -96,7 +113,7 @@ const App: React.FC = () => {
             />
         ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
-                Select a channel to begin operations.
+                {channels.length === 0 ? 'You are not in any channels. Use search to join one.' : 'Select a channel to begin operations.'}
             </div>
         )}
       </main>
