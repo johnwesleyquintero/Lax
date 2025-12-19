@@ -7,6 +7,77 @@ interface MessageBubbleProps {
   isSequential: boolean;
 }
 
+// Simple Markdown Parser for React
+const formatContent = (text: string) => {
+  if (!text) return null;
+
+  // 1. Split by Code Blocks (`code`) - highest precedence, no nested formatting inside
+  // Regex captures the delimiter and content: (`...`)
+  const codeParts = text.split(/(`[^`]+`)/g);
+
+  return codeParts.map((part, index) => {
+    // If it's a code block
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) {
+      return (
+        <code key={`c-${index}`} className="bg-slate-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-slate-200">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    // 2. Parse Bold (*text*)
+    const boldParts = part.split(/(\*[^*]+\*)/g);
+    return (
+      <span key={`p-${index}`}>
+        {boldParts.map((bPart, bIndex) => {
+          if (bPart.startsWith('*') && bPart.endsWith('*') && bPart.length > 1) {
+            // Content inside bold
+            const content = bPart.slice(1, -1);
+            // 3. Parse Italic inside Bold (_text_)
+            return (
+               <strong key={`b-${index}-${bIndex}`} className="font-semibold text-gray-900">
+                  {parseItalicAndStrike(content, `b-${index}-${bIndex}`)}
+               </strong>
+            );
+          }
+          // Not bold, parse Italic/Strike directly
+          return parseItalicAndStrike(bPart, `t-${index}-${bIndex}`);
+        })}
+      </span>
+    );
+  });
+};
+
+// Helper for Italic and Strike recursion
+const parseItalicAndStrike = (text: string, keyPrefix: string) => {
+   const iParts = text.split(/(_[^_]+_)/g);
+   return iParts.map((iPart, iIndex) => {
+      if (iPart.startsWith('_') && iPart.endsWith('_') && iPart.length > 1) {
+         const content = iPart.slice(1, -1);
+         return (
+            <em key={`${keyPrefix}-i-${iIndex}`} className="italic">
+               {parseStrike(content, `${keyPrefix}-i-${iIndex}`)}
+            </em>
+         );
+      }
+      return parseStrike(iPart, `${keyPrefix}-i-${iIndex}`);
+   });
+};
+
+const parseStrike = (text: string, keyPrefix: string) => {
+    const sParts = text.split(/(~[^~]+~)/g);
+    return sParts.map((sPart, sIndex) => {
+        if (sPart.startsWith('~') && sPart.endsWith('~') && sPart.length > 1) {
+            return (
+                <del key={`${keyPrefix}-s-${sIndex}`} className="line-through text-gray-400">
+                    {sPart.slice(1, -1)}
+                </del>
+            );
+        }
+        return <span key={`${keyPrefix}-tx-${sIndex}`}>{sPart}</span>;
+    });
+};
+
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequential }) => {
   const date = new Date(message.created_at);
   
@@ -33,7 +104,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequenti
           {timeString}
         </div>
         <div className="flex-1 text-gray-800 break-words leading-relaxed max-w-full">
-           {message.content}
+           {formatContent(message.content)}
         </div>
       </div>
     );
@@ -50,7 +121,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, user, isSequenti
           <span className="text-xs text-gray-500">{timeString}</span>
         </div>
         <div className="text-gray-800 break-words leading-relaxed">
-          {message.content}
+          {formatContent(message.content)}
         </div>
       </div>
     </div>

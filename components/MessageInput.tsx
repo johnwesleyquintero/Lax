@@ -1,4 +1,4 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent } from 'react';
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void;
@@ -8,6 +8,7 @@ interface MessageInputProps {
 
 const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName, disabled }) => {
   const [text, setText] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     if (text.trim() && !disabled) {
@@ -23,26 +24,80 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
     }
   };
 
+  const applyFormat = (format: 'bold' | 'italic' | 'strike' | 'code') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    const selectedText = value.substring(start, end);
+
+    let prefix = '';
+    let suffix = '';
+
+    switch (format) {
+      case 'bold': prefix = '*'; suffix = '*'; break;
+      case 'italic': prefix = '_'; suffix = '_'; break;
+      case 'strike': prefix = '~'; suffix = '~'; break;
+      case 'code': prefix = '`'; suffix = '`'; break;
+    }
+
+    // Insert formatting around selection or at cursor
+    const newText = value.substring(0, start) + prefix + selectedText + suffix + value.substring(end);
+    setText(newText);
+    
+    // Defer focus restoration to ensure React state update has processed
+    setTimeout(() => {
+        textarea.focus();
+        // Move cursor inside the formatting if no text was selected
+        if (start === end) {
+            textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+        } else {
+            // Select the text including markers (or just the text? standard is keeping selection)
+            // Let's put cursor after the suffix for ease of typing
+            textarea.setSelectionRange(end + prefix.length + suffix.length, end + prefix.length + suffix.length);
+        }
+    }, 0);
+  };
+
   return (
     <div className="px-4 pb-4 pt-2 bg-white">
       <div className="border border-gray-300 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white transition-all">
         <div className="bg-gray-50 border-b border-gray-200 px-2 py-1 flex items-center gap-2 rounded-t-lg">
-           {/* Formatting toolbar placeholder */}
-           <button className="p-1 text-gray-500 hover:bg-gray-200 rounded" title="Bold">
-             <span className="font-bold text-xs serif">B</span>
+           {/* Formatting toolbar */}
+           <button 
+             onClick={() => applyFormat('bold')}
+             className="p-1 text-gray-500 hover:bg-gray-200 rounded transition-colors group" 
+             title="Bold (Cmd+B)"
+           >
+             <span className="font-bold text-xs serif group-hover:text-gray-900">B</span>
            </button>
-           <button className="p-1 text-gray-500 hover:bg-gray-200 rounded" title="Italic">
-             <span className="italic text-xs serif">I</span>
+           <button 
+             onClick={() => applyFormat('italic')}
+             className="p-1 text-gray-500 hover:bg-gray-200 rounded transition-colors group" 
+             title="Italic (Cmd+I)"
+           >
+             <span className="italic text-xs serif group-hover:text-gray-900">I</span>
            </button>
-           <button className="p-1 text-gray-500 hover:bg-gray-200 rounded" title="Strike">
-             <span className="line-through text-xs serif">S</span>
+           <button 
+             onClick={() => applyFormat('strike')}
+             className="p-1 text-gray-500 hover:bg-gray-200 rounded transition-colors group" 
+             title="Strike"
+           >
+             <span className="line-through text-xs serif group-hover:text-gray-900">S</span>
            </button>
            <div className="h-4 w-px bg-gray-300 mx-1"></div>
-           <button className="p-1 text-gray-500 hover:bg-gray-200 rounded" title="Code">
-             <span className="text-xs font-mono">{'<>'}</span>
+           <button 
+             onClick={() => applyFormat('code')}
+             className="p-1 text-gray-500 hover:bg-gray-200 rounded transition-colors group" 
+             title="Code"
+           >
+             <span className="text-xs font-mono group-hover:text-gray-900">{'<>'}</span>
            </button>
         </div>
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -54,7 +109,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
         />
         <div className="flex justify-between items-center px-2 pb-2">
             <div className="text-xs text-gray-400">
-                Type <strong>@</strong> to mention
+                Supports Markdown: <strong>*bold*</strong>, <em>_italic_</em>, <del>~strike~</del>, <code>`code`</code>
             </div>
             <button
                 onClick={handleSend}
