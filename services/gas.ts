@@ -87,7 +87,7 @@ class GasService {
 
   private async fetchGas<T>(action: string, payload: any = {}): Promise<T> {
     if (!this.apiUrl) {
-      throw new Error("API URL not configured.");
+      throw new Error("Configuration missing. Please go to Config > Enter your GAS Web App URL.");
     }
 
     try {
@@ -103,6 +103,10 @@ class GasService {
 
       const json: ApiResponse<T> = await response.json();
       if (json.status === 'error') {
+        // Detect "Unknown action" specifically to help user debug deployment issues
+        if (json.message && json.message.includes('Unknown action')) {
+            throw new Error(`Backend Outdated: The server does not support '${action}'. Please redeploy your Google Apps Script (New Deployment).`);
+        }
         throw new Error(json.message || 'Unknown GAS Error');
       }
       return json.data as T;

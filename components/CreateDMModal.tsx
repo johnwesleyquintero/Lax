@@ -26,9 +26,9 @@ const CreateDMModal: React.FC<CreateDMModalProps> = ({ onClose, onCreated, curre
       const dmChannel = await api.createDM(targetUser.user_id, currentUser.user_id);
       onCreated(dmChannel);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to open secure line");
+      alert(error.message || "Failed to open secure line");
     } finally {
       setLoading(false);
     }

@@ -7,7 +7,8 @@ export const APP_CONFIG = {
   GOOGLE_CLIENT_ID: '408818190066-66mpmibsibbj6qasm1i405esof76hrnj.apps.googleusercontent.com',
   
   // The deployed Google Apps Script Web App URL
-  DEFAULT_API_URL: 'https://script.google.com/macros/s/AKfycbzERwiU_Cd0zNvQ1tyPlNtMHX6QYYfG3ND1z9iavY6vxmhP3oPaRsIG_MRttEkf7WUJ/exec',
+  // We leave this empty to force operators to deploy their own infrastructure
+  DEFAULT_API_URL: '', 
   
   // Local Storage Keys
   LOCAL_STORAGE_KEYS: {
