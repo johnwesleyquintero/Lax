@@ -1,6 +1,6 @@
 # Lax 🛠️
 
-A sovereign, broke-proof Slack clone for Operators.
+A sovereign, simple Slack clone for Operators.
 Built with **React + TypeScript** on the frontend and **Google Apps Script + Google Sheets** on the backend.
 
 No servers. No database bills. Just Google infrastructure.
