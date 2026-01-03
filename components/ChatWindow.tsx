@@ -22,7 +22,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
   const [isSending, setIsSending] = useState(false);
   const [showChannelSettings, setShowChannelSettings] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
   const { addToast } = useToast();
   
   // Create a map for fast user lookups
@@ -36,6 +40,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     }, {} as Record<string, User>);
   }, [users]);
 
+  // Handle Scroll Logic to prevent jumping
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        // Consider "at bottom" if within 100px
+        const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+        setIsAtBottom(atBottom);
+    }
+  };
+
+  // Reset scroll stickiness when channel changes
+  useEffect(() => {
+    setIsAtBottom(true);
+    setMessages([]); // Clear previous messages immediately to prevent ghosting
+    setIsLoading(true);
+  }, [channel.channel_id]);
+
   // Polling logic
   useEffect(() => {
     let isMounted = true;
@@ -46,7 +67,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
         const msgs = await api.getMessages(channel.channel_id);
         
         if (isMounted) {
-          setMessages(msgs);
+          // Optimization: deep compare to prevent unnecessary re-renders
+          setMessages(prev => {
+             // Simple JSON stringify is efficient enough for typical chat batch sizes
+             if (JSON.stringify(prev) === JSON.stringify(msgs)) return prev;
+             return msgs;
+          });
           setIsLoading(false);
         }
       } catch (error) {
@@ -55,8 +81,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     };
 
     // Initial fetch
-    setMessages([]);
-    setIsLoading(true);
     fetchMessages();
 
     // Start Polling
@@ -68,13 +92,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     };
   }, [channel.channel_id]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll effect
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, channel.channel_id]);
+    if (isAtBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isAtBottom]);
 
   const handleSendMessage = async (content: string) => {
     setIsSending(true);
+    setIsAtBottom(true); // Force scroll to bottom on send
     try {
         // Optimistic UI update
         const tempMsg: Message = {
@@ -229,7 +256,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar flex flex-col bg-white">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar flex flex-col bg-white"
+      >
         {isLoading && messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center space-y-3">
              <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
@@ -299,6 +330,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       {/* Input Area */}
       <div className="flex-shrink-0 z-10 bg-white">
         <MessageInput 
+            key={channel.channel_id}
             onSendMessage={handleSendMessage} 
             channelName={isDM ? displayName : channel.channel_name}
             disabled={isSending}
