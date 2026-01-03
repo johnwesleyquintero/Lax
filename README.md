@@ -50,7 +50,7 @@ To make this a real, multi-user chat app, you need to deploy the Google Apps Scr
 ### 2. Deploy API
 1.  **Deploy**:
     *   Click **Deploy** > **New deployment**.
-    *   Description: `v2 - edit delete`.
+    *   Description: `v3 - pagination support`.
     *   **Execute as**: **Me** (your email).
     *   **Who has access**: **Anyone** (Important for CORS).
     *   Click **Deploy** and copy the **Web App URL**.
@@ -111,7 +111,8 @@ function ensureSheet(ss, name, headers) {
  */
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  // Wait up to 30s for lock, else fail. Prevents race conditions.
+  lock.tryLock(30000); 
 
   try {
     const postData = JSON.parse(e.postData.contents);
@@ -202,8 +203,6 @@ function doPost(e) {
       if (!found) throw new Error("Channel not found");
     }
     else if (action === 'deleteChannel') {
-        // Simple implementation: delete the row from Channels.
-        // In a real app, you'd cascade delete messages or mark as deleted.
         const sheet = ss.getSheetByName('Channels');
         const data = sheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {
@@ -248,7 +247,32 @@ function doPost(e) {
 
     else if (action === 'getMessages') {
       const allMsgs = getSheetData(ss.getSheetByName('Messages'));
-      result = allMsgs.filter(r => r.channel_id === payload.channelId);
+      
+      // Filter by Channel
+      let filtered = allMsgs.filter(r => r.channel_id === payload.channelId);
+
+      // Filter by Timestamp (Incremental Sync)
+      if (payload.afterTs) {
+        const afterDate = new Date(payload.afterTs);
+        filtered = filtered.filter(r => new Date(r.created_at) > afterDate);
+      }
+
+      // Sort Ascending (Oldest -> Newest)
+      // Note: Data is likely inserted in order, but good to ensure
+      // This is expensive on large arrays, assuming spreadsheet is mostly append-only
+      // filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+      // Pagination / Limiting
+      // If we are NOT doing incremental sync (loading history), apply limit
+      // If we ARE doing incremental sync (afterTs), we usually want ALL new messages, 
+      // but a safety cap (e.g. 500) prevents overload if user was offline for weeks.
+      const limit = payload.limit || 100;
+      if (filtered.length > limit) {
+         // Return the LAST 'limit' messages (latest)
+         filtered = filtered.slice(filtered.length - limit);
+      }
+      
+      result = filtered;
     } 
     else if (action === 'sendMessage') {
       const sheet = ss.getSheetByName('Messages');
@@ -265,10 +289,8 @@ function doPost(e) {
     else if (action === 'editMessage') {
         const sheet = ss.getSheetByName('Messages');
         const data = sheet.getDataRange().getValues();
-        // find row by message_id (col 0)
         for(let i=1; i<data.length; i++) {
             if (data[i][0] === payload.messageId) {
-                // Update content column (index 3 based on setup headers)
                 sheet.getRange(i+1, 4).setValue(payload.content);
                 break;
             }

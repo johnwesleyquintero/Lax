@@ -73,9 +73,9 @@ class GasService {
     return this.fetchGas<void>('joinChannel', { channelId, userId });
   }
 
-  public async getMessages(channelId: string, afterTs?: string): Promise<Message[]> {
-    if (this.useMock) return this.mockGetMessages(channelId, afterTs);
-    return this.fetchGas<Message[]>('getMessages', { channelId, afterTs });
+  public async getMessages(channelId: string, afterTs?: string, limit: number = 100): Promise<Message[]> {
+    if (this.useMock) return this.mockGetMessages(channelId, afterTs, limit);
+    return this.fetchGas<Message[]>('getMessages', { channelId, afterTs, limit });
   }
 
   public async sendMessage(channelId: string, userId: string, content: string): Promise<Message> {
@@ -105,35 +105,64 @@ class GasService {
 
   // --- Internal GAS Fetcher ---
 
-  private async fetchGas<T>(action: string, payload: any = {}): Promise<T> {
+  private async fetchGas<T>(action: string, payload: any = {}, retries = 2): Promise<T> {
     if (!this.apiUrl) {
       throw new Error("Configuration missing. Please go to Config > Enter your GAS Web App URL.");
     }
 
-    try {
-      // In a real GAS 'doPost', usually we send data as a stringified body
-      // We might need 'no-cors' if just triggering, but for reading we need CORS enabled on GAS script.
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8', // GAS often prefers text/plain to avoid preflight options
-        },
-        body: JSON.stringify({ action, payload }),
-      });
+    let lastError: any;
 
-      const json: ApiResponse<T> = await response.json();
-      if (json.status === 'error') {
-        // Detect "Unknown action" specifically to help user debug deployment issues
-        if (json.message && json.message.includes('Unknown action')) {
-            throw new Error(`Backend Outdated: The server does not support '${action}'. Please redeploy your Google Apps Script (New Deployment).`);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(this.apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8', 
+          },
+          body: JSON.stringify({ action, payload }),
+        });
+
+        const text = await response.text();
+        let json: ApiResponse<T>;
+
+        try {
+            json = JSON.parse(text);
+        } catch (e) {
+            // Check for HTML error response (common with GAS timeouts/errors)
+            if (text.trim().startsWith('<')) {
+                const titleMatch = text.match(/<title>(.*?)<\/title>/);
+                const title = titleMatch ? titleMatch[1] : 'Unknown Server Error';
+                throw new Error(`Server Error: ${title}`);
+            }
+            throw new Error(`Malformed JSON response: ${text.slice(0, 100)}`);
         }
-        throw new Error(json.message || 'Unknown GAS Error');
+        
+        if (json.status === 'error') {
+          if (json.message && json.message.includes('Unknown action')) {
+              throw new Error(`Backend Outdated: The server does not support '${action}'. Please redeploy your Google Apps Script.`);
+          }
+          throw new Error(json.message || 'Unknown GAS Error');
+        }
+
+        return json.data as T;
+
+      } catch (error) {
+        console.warn(`Attempt ${attempt + 1} failed for ${action}:`, error);
+        lastError = error;
+        
+        // Don't retry if it's a configuration error
+        if (error instanceof Error && error.message.includes('Configuration missing')) {
+            throw error;
+        }
+
+        if (attempt < retries) {
+            // Exponential backoff: 500ms, 1000ms, etc.
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
+        }
       }
-      return json.data as T;
-    } catch (error) {
-      console.error(`GAS Error [${action}]:`, error);
-      throw error;
     }
+
+    throw lastError;
   }
 
   // --- Mock Implementation (Local Storage) ---
@@ -159,7 +188,6 @@ class GasService {
     }
 
     // 3. Channel Members (New)
-    // If not exists, seed it by adding all current users to all current public channels to migrate
     const MEMBERS_KEY = 'op_chat_channel_members';
     if (!localStorage.getItem(MEMBERS_KEY)) {
       const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
@@ -170,7 +198,6 @@ class GasService {
       // Auto-join logic for initial seed
       channels.forEach(c => {
         users.forEach(u => {
-             // Add everyone to public channels, add system/admin to private ops
              if (!c.is_private || c.channel_name === 'operations') {
                  members.push({ channel_id: c.channel_id, user_id: u.user_id, joined_at: new Date().toISOString() });
              }
@@ -254,7 +281,7 @@ class GasService {
       setTimeout(() => {
         const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
         
-        const slug = name.toLowerCase().replace(/[^a-z0-9_]/g, '-'); // Allow underscore for DMs
+        const slug = name.toLowerCase().replace(/[^a-z0-9_]/g, '-');
         
         const newChannel: Channel = {
           channel_id: 'c_' + slug + '_' + Date.now().toString().slice(-4),
@@ -268,7 +295,6 @@ class GasService {
         channels.push(newChannel);
         localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
 
-        // Auto-join the creator
         const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
         members.push({ channel_id: newChannel.channel_id, user_id: creatorId, joined_at: new Date().toISOString() });
         localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
@@ -305,7 +331,6 @@ class GasService {
             channels = channels.filter(c => c.channel_id !== channelId);
             localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
             
-            // Clean up members (optional for mock, but good for hygiene)
             let members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
             members = members.filter(m => m.channel_id !== channelId);
             localStorage.setItem('op_chat_channel_members', JSON.stringify(members));
@@ -320,15 +345,12 @@ class GasService {
         setTimeout(() => {
             const channels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
             
-            // Check if exists
             const existing = channels.find(c => c.channel_name === name && c.type === 'dm');
             if (existing) {
-                // Ensure membership logic is robust (in case one side left? DMs shouldn't be leaveable really)
                 resolve(existing);
                 return;
             }
 
-            // Create new
             const newChannel: Channel = {
                 channel_id: 'dm_' + Date.now() + Math.random().toString(36).substr(2, 5),
                 channel_name: name,
@@ -341,7 +363,6 @@ class GasService {
             channels.push(newChannel);
             localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS, JSON.stringify(channels));
 
-            // Join BOTH users
             const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
             members.push({ channel_id: newChannel.channel_id, user_id: currentUserId, joined_at: new Date().toISOString() });
             members.push({ channel_id: newChannel.channel_id, user_id: targetUserId, joined_at: new Date().toISOString() });
@@ -352,14 +373,25 @@ class GasService {
       });
   }
 
-  private mockGetMessages(channelId: string, afterTs?: string): Promise<Message[]> {
+  private mockGetMessages(channelId: string, afterTs?: string, limit: number = 100): Promise<Message[]> {
     return new Promise((resolve) => {
       setTimeout(() => {
         const allMessages: Message[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES) || '[]');
-        const filtered = allMessages.filter(m => 
+        
+        let filtered = allMessages.filter(m => 
           m.channel_id === channelId && 
           (!afterTs || new Date(m.created_at) > new Date(afterTs))
         );
+
+        // Sort by Time Ascending (Oldest First) - standard for chat
+        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        // Apply Limit: If no afterTs (initial load), take the last N. 
+        // If afterTs is present, we usually want ALL updates, but let's respect limit for safety
+        if (filtered.length > limit) {
+             filtered = filtered.slice(filtered.length - limit);
+        }
+        
         resolve(filtered);
       }, 300);
     });
