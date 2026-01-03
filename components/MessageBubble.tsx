@@ -28,24 +28,48 @@ const formatContent = (text: string) => {
       );
     }
 
-    // 2. Parse Mentions (@Username) - Second precedence
-    const mentionParts = part.split(/(@[a-zA-Z0-9_\-]+)/g);
-    
+    // 2. Parse URLs - Second precedence
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlParts = part.split(urlRegex);
+
     return (
-      <span key={`m-group-${index}`}>
-        {mentionParts.map((mPart, mIndex) => {
-            if (mPart.startsWith('@') && mPart.length > 1) {
+        <span key={`u-group-${index}`}>
+            {urlParts.map((uPart, uIndex) => {
+                if (uPart.match(urlRegex)) {
+                    return (
+                        <a 
+                            key={`u-${index}-${uIndex}`} 
+                            href={uPart} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 hover:underline break-all"
+                            onClick={(e) => e.stopPropagation()} // Prevent bubble click
+                        >
+                            {uPart}
+                        </a>
+                    );
+                }
+
+                // 3. Parse Mentions (@Username) - Third precedence
+                const mentionParts = uPart.split(/(@[a-zA-Z0-9_\-]+)/g);
                 return (
-                    <span key={`m-${index}-${mIndex}`} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium mx-0.5 cursor-pointer hover:bg-blue-200 transition-colors">
-                        {mPart}
+                    <span key={`m-group-${index}-${uIndex}`}>
+                        {mentionParts.map((mPart, mIndex) => {
+                            if (mPart.startsWith('@') && mPart.length > 1) {
+                                return (
+                                    <span key={`m-${index}-${uIndex}-${mIndex}`} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium mx-0.5 cursor-pointer hover:bg-blue-200 transition-colors">
+                                        {mPart}
+                                    </span>
+                                );
+                            }
+                            
+                            // 4. Parse Bold inside non-mention text
+                            return parseBold(mPart, `b-${index}-${uIndex}-${mIndex}`);
+                        })}
                     </span>
                 );
-            }
-            
-            // 3. Parse Bold inside non-mention text
-            return parseBold(mPart, `b-${index}-${mIndex}`);
-        })}
-      </span>
+            })}
+        </span>
     );
   });
 };

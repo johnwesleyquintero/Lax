@@ -32,10 +32,32 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
   }, [mentionQuery, showMentions, users]);
 
   const handleSend = () => {
-    if (text.trim() && !disabled) {
-      onSendMessage(text);
-      setText('');
-      setShowMentions(false);
+    if (!text.trim() || disabled) return;
+
+    let finalMessage = text;
+
+    // Slash Commands Processing
+    if (text.startsWith('/')) {
+        const cmd = text.trim().toLowerCase();
+        if (cmd === '/shrug') {
+            finalMessage = '¯\\_(ツ)_/¯';
+        } else if (cmd === '/tableflip' || cmd === '/flip') {
+            finalMessage = '(╯°□°)╯︵ ┻━┻';
+        } else if (cmd === '/unflip') {
+            finalMessage = '┬─┬ノ( º _ ºノ)';
+        } else if (cmd === '/lenny') {
+            finalMessage = '( ͡° ͜ʖ ͡°)';
+        }
+        // If it was a known command, finalMessage changed. If unknown, we send literally.
+    }
+
+    onSendMessage(finalMessage);
+    setText('');
+    setShowMentions(false);
+    
+    // Reset height
+    if(textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
     }
   };
 
@@ -74,6 +96,10 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
       const newVal = e.target.value;
       setText(newVal);
 
+      // Auto-resize
+      e.target.style.height = 'auto';
+      e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
+
       // Check for mention trigger
       const cursor = e.target.selectionStart;
       const textBeforeCursor = newVal.slice(0, cursor);
@@ -84,7 +110,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
       if (lastWordMatch && lastWordMatch[0].startsWith('@')) {
           const query = lastWordMatch[0].slice(1);
           // Only show if query doesn't contain invalid chars for a potential name yet
-          // Allowing letters, numbers, underscores, dashes
           if (/^[a-zA-Z0-9_\-]*$/.test(query)) {
               setMentionQuery(query);
               setShowMentions(true);
@@ -225,13 +250,13 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder={`Message #${channelName}`}
-          className="w-full max-h-60 min-h-[80px] p-3 text-gray-900 placeholder-gray-400 focus:outline-none resize-none bg-transparent"
+          className="w-full max-h-60 min-h-[44px] p-3 text-gray-900 placeholder-gray-400 focus:outline-none resize-none bg-transparent overflow-hidden"
           rows={1}
           style={{ height: 'auto', minHeight: '44px' }}
         />
         <div className="flex justify-between items-center px-2 pb-2">
             <div className="text-xs text-gray-400">
-                Type <strong>@</strong> to mention
+                Type <strong>@</strong> to mention, <strong>/shrug</strong> for fun
             </div>
             <button
                 onClick={handleSend}
