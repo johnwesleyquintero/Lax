@@ -31,6 +31,14 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
     }
   }, [mentionQuery, showMentions, users]);
 
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
+    }
+  };
+
   const handleSend = () => {
     if (!text.trim() || disabled) return;
 
@@ -58,6 +66,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
     // Reset height
     if(textareaRef.current) {
         textareaRef.current.style.height = 'auto';
+        // Force reset to min height
+        textareaRef.current.style.height = '44px'; 
     }
   };
 
@@ -95,10 +105,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newVal = e.target.value;
       setText(newVal);
-
-      // Auto-resize
-      e.target.style.height = 'auto';
-      e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
+      adjustHeight();
 
       // Check for mention trigger
       const cursor = e.target.selectionStart;
@@ -145,6 +152,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
         textarea.focus();
         const newCursorPos = lastAtIndex + token.length + 2; // +2 for @ and space
         textarea.setSelectionRange(newCursorPos, newCursorPos);
+        adjustHeight();
     }, 0);
   };
 
@@ -177,6 +185,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
         } else {
             textarea.setSelectionRange(end + prefix.length + suffix.length, end + prefix.length + suffix.length);
         }
+        adjustHeight();
     }, 0);
   };
 

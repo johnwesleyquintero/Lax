@@ -17,7 +17,9 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, onUserClick, onChannelDeleted, onChannelUpdated }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]); // Confirmed messages from server
+  const [pendingMessages, setPendingMessages] = useState<Message[]>([]); // Optimistic local messages
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [showChannelSettings, setShowChannelSettings] = useState(false);
@@ -50,10 +52,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     }
   };
 
-  // Reset scroll stickiness when channel changes
+  // Reset state when channel changes
   useEffect(() => {
     setIsAtBottom(true);
-    setMessages([]); // Clear previous messages immediately to prevent ghosting
+    setMessages([]);
+    setPendingMessages([]); // Clear pending messages for previous channel
     setIsLoading(true);
   }, [channel.channel_id]);
 
@@ -92,31 +95,50 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     };
   }, [channel.channel_id]);
 
+  // Combined messages for display (Confirmed + Pending)
+  // We filter out any pending messages that might have been confirmed by the server (ID collision check, though IDs usually differ)
+  const displayMessages = [...messages, ...pendingMessages];
+
   // Auto-scroll effect
   useEffect(() => {
     if (isAtBottom && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isAtBottom]);
+  }, [displayMessages.length, isAtBottom]);
 
   const handleSendMessage = async (content: string) => {
+    if (!content.trim()) return;
     setIsSending(true);
     setIsAtBottom(true); // Force scroll to bottom on send
-    try {
-        // Optimistic UI update
-        const tempMsg: Message = {
-            message_id: 'temp-' + Date.now(),
-            channel_id: channel.channel_id,
-            user_id: currentUser.user_id,
-            content: content,
-            created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, tempMsg]);
+    
+    // Optimistic UI update
+    const tempId = 'temp-' + Date.now();
+    const tempMsg: Message = {
+        message_id: tempId,
+        channel_id: channel.channel_id,
+        user_id: currentUser.user_id,
+        content: content,
+        created_at: new Date().toISOString()
+    };
+    
+    setPendingMessages(prev => [...prev, tempMsg]);
 
-        await api.sendMessage(channel.channel_id, currentUser.user_id, content);
+    try {
+        const realMsg = await api.sendMessage(channel.channel_id, currentUser.user_id, content);
+        
+        // On success, remove from pending and add to confirmed
+        setPendingMessages(prev => prev.filter(m => m.message_id !== tempId));
+        setMessages(prev => {
+            // Check if it already exists (from a quick poll) to avoid dupe
+            if (prev.some(m => m.message_id === realMsg.message_id)) return prev;
+            return [...prev, realMsg];
+        });
     } catch (error) {
         console.error("Failed to send", error);
         addToast("Failed to send message. Connection failed.", 'error');
+        // Keep in pending but maybe mark as error? For now, we leave it or user can retry.
+        // To be safe, let's remove it so it doesn't look like it sent.
+        setPendingMessages(prev => prev.filter(m => m.message_id !== tempId));
     } finally {
         setIsSending(false);
     }
@@ -291,7 +313,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                 </p>
             </div>
             
-            {messages.length === 0 && !isLoading && (
+            {displayMessages.length === 0 && !isLoading && (
                  <div className="flex flex-col items-center justify-center py-12 text-slate-300">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -300,26 +322,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
                  </div>
             )}
 
-            {messages.map((msg, index) => {
-              const prevMsg = messages[index - 1];
+            {displayMessages.map((msg, index) => {
+              const prevMsg = displayMessages[index - 1];
               // Check if sequential: same user and less than 5 mins apart
               const isSequential = prevMsg 
                 && prevMsg.user_id === msg.user_id
                 && (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 5 * 60 * 1000);
               
               const user = userMap.current[msg.user_id];
+              const isPending = pendingMessages.some(pm => pm.message_id === msg.message_id);
 
               return (
-                <MessageBubble 
-                  key={msg.message_id} 
-                  message={msg} 
-                  user={user} 
-                  isSequential={isSequential}
-                  onUserClick={onUserClick}
-                  currentUser={currentUser}
-                  onEdit={handleEditMessage}
-                  onDelete={handleDeleteMessage}
-                />
+                <div key={msg.message_id} className={isPending ? "opacity-70 transition-opacity" : ""}>
+                    <MessageBubble 
+                      message={msg} 
+                      user={user} 
+                      isSequential={isSequential}
+                      onUserClick={onUserClick}
+                      currentUser={currentUser}
+                      onEdit={handleEditMessage}
+                      onDelete={handleDeleteMessage}
+                    />
+                </div>
               );
             })}
             <div ref={messagesEndRef} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Channel, User } from './types';
 import { APP_CONFIG } from './constants';
 import { api } from './services/gas';
@@ -23,6 +23,9 @@ const AppContent: React.FC = () => {
 
   // Map of channel_id -> ISO string of last visit time
   const [lastVisited, setLastVisited] = useState<Record<string, string>>({});
+  
+  // Ref to track the previous channel so we can mark it as read when leaving
+  const prevChannelRef = useRef<string>('');
 
   // Restore session & Last Visited
   useEffect(() => {
@@ -40,16 +43,37 @@ const AppContent: React.FC = () => {
     setLoadingInitial(false);
   }, []);
 
-  // Track Last Visited Channel
+  // Track Last Visited Channel logic
+  // We mark a channel as "read" (visited) both when we enter it AND when we leave it.
+  // This ensures that if messages arrive while we are viewing it, and then we leave, 
+  // we don't get a "ghost" unread indicator for the channel we just left.
   useEffect(() => {
-    if (currentChannelId) {
-        const now = new Date().toISOString();
-        setLastVisited(prev => {
-            const updated = { ...prev, [currentChannelId]: now };
+    const now = new Date().toISOString();
+    
+    setLastVisited(prev => {
+        const updated = { ...prev };
+        let changed = false;
+
+        // 1. Mark the channel we just LEFT as read (flush pending unreads)
+        if (prevChannelRef.current && prevChannelRef.current !== currentChannelId) {
+            updated[prevChannelRef.current] = now;
+            changed = true;
+        }
+
+        // 2. Mark the channel we just ENTERED as read
+        if (currentChannelId) {
+            updated[currentChannelId] = now;
+            changed = true;
+        }
+
+        if (changed) {
             localStorage.setItem('op_chat_last_visited', JSON.stringify(updated));
             return updated;
-        });
-    }
+        }
+        return prev;
+    });
+
+    prevChannelRef.current = currentChannelId;
   }, [currentChannelId]);
 
   const loadMetadata = useCallback(async () => {
