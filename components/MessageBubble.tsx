@@ -65,7 +65,8 @@ const parseBold = (text: string, keyPrefix: string) => {
 
 // 3. Mentions
 const parseMentions = (text: string, keyPrefix: string) => {
-    const mentionParts = text.split(/(@[a-zA-Z0-9_\-]+)/g);
+    // Updated regex to include dots in username handles
+    const mentionParts = text.split(/(@[a-zA-Z0-9_\-\.]+)/g);
     return (
         <span key={`${keyPrefix}-m-group`}>
             {mentionParts.map((mPart, mIndex) => {

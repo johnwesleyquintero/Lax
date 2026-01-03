@@ -117,7 +117,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, channelName,
       if (lastWordMatch && lastWordMatch[0].startsWith('@')) {
           const query = lastWordMatch[0].slice(1);
           // Only show if query doesn't contain invalid chars for a potential name yet
-          if (/^[a-zA-Z0-9_\-]*$/.test(query)) {
+          // Updated regex to include dots
+          if (/^[a-zA-Z0-9_\-\.]*$/.test(query)) {
               setMentionQuery(query);
               setShowMentions(true);
               return;

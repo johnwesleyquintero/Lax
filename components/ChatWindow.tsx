@@ -28,6 +28,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  
+  // Track initial load to prevent smooth scrolling on first render
+  const isInitialLoadRef = useRef(true);
 
   const { addToast } = useToast();
   
@@ -58,6 +61,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
     setMessages([]);
     setPendingMessages([]); // Clear pending messages for previous channel
     setIsLoading(true);
+    isInitialLoadRef.current = true; // Reset scroll tracker
   }, [channel.channel_id]);
 
   // Polling logic
@@ -102,7 +106,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
   // Auto-scroll effect
   useEffect(() => {
     if (isAtBottom && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      // On initial load, scroll instantly (auto). For new messages, scroll smoothly.
+      const behavior = isInitialLoadRef.current ? 'auto' : 'smooth';
+      messagesEndRef.current.scrollIntoView({ behavior });
+      
+      // If we have content, we are no longer in initial load state
+      if (displayMessages.length > 0) {
+          // Small timeout to ensure DOM painted before disabling "auto" behavior flag
+          setTimeout(() => {
+              isInitialLoadRef.current = false;
+          }, 100);
+      }
     }
   }, [displayMessages.length, isAtBottom]);
 

@@ -70,12 +70,12 @@ function setup() {
   ]);
 
   // 2. Channels Sheet
-  const chSheet = ensureSheet(ss, 'Channels', [
-    'channel_id', 'channel_name', 'is_private', 'created_by', 'created_at', 'type'
+  ensureSheet(ss, 'Channels', [
+    'channel_id', 'channel_name', 'is_private', 'created_by', 'created_at', 'type', 'last_message_at'
   ]);
   // Seed General Channel if empty
-  if (chSheet.getLastRow() === 1) {
-     chSheet.appendRow(['c_general', 'general', false, 'system', new Date().toISOString(), 'channel']);
+  if (ss.getSheetByName('Channels').getLastRow() === 1) {
+     ss.getSheetByName('Channels').appendRow(['c_general', 'general', false, 'system', new Date().toISOString(), 'channel', new Date().toISOString()]);
   }
 
   // 3. ChannelMembers Sheet
@@ -167,7 +167,8 @@ function doPost(e) {
         payload.isPrivate, 
         payload.creatorId, 
         new Date().toISOString(),
-        payload.type || 'channel'
+        payload.type || 'channel',
+        new Date().toISOString() // last_message_at
       ];
       cSheet.appendRow(newChannelRow);
       
@@ -230,7 +231,8 @@ function doPost(e) {
              true, // DMs are always private
              payload.creatorId,
              new Date().toISOString(),
-             'dm'
+             'dm',
+             new Date().toISOString()
           ];
           cSheet.appendRow(newRow);
 
@@ -257,15 +259,7 @@ function doPost(e) {
         filtered = filtered.filter(r => new Date(r.created_at) > afterDate);
       }
 
-      // Sort Ascending (Oldest -> Newest)
-      // Note: Data is likely inserted in order, but good to ensure
-      // This is expensive on large arrays, assuming spreadsheet is mostly append-only
-      // filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-
       // Pagination / Limiting
-      // If we are NOT doing incremental sync (loading history), apply limit
-      // If we ARE doing incremental sync (afterTs), we usually want ALL new messages, 
-      // but a safety cap (e.g. 500) prevents overload if user was offline for weeks.
       const limit = payload.limit || 100;
       if (filtered.length > limit) {
          // Return the LAST 'limit' messages (latest)
@@ -276,14 +270,30 @@ function doPost(e) {
     } 
     else if (action === 'sendMessage') {
       const sheet = ss.getSheetByName('Messages');
+      const timestamp = new Date().toISOString();
       const newRow = [
         Utilities.getUuid(),
         payload.channelId,
         payload.userId,
         payload.message,
-        new Date().toISOString()
+        timestamp
       ];
       sheet.appendRow(newRow);
+      
+      // Update Channel last_message_at
+      const cSheet = ss.getSheetByName('Channels');
+      const cData = cSheet.getDataRange().getValues();
+      for(let i=1; i<cData.length; i++) {
+        if (cData[i][0] === payload.channelId) {
+           // Column 7 (index 6) is last_message_at. 
+           // NOTE: If your sheet was created with older version, you must add this column manually or run setup again.
+           if (cData[0].length >= 7) {
+               cSheet.getRange(i+1, 7).setValue(timestamp);
+           }
+           break;
+        }
+      }
+
       result = zipRow(sheet, newRow);
     }
     else if (action === 'editMessage') {
