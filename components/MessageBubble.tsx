@@ -11,84 +11,13 @@ interface MessageBubbleProps {
   onDelete: (messageId: string) => void;
 }
 
-// Simple Markdown Parser for React
-const formatContent = (text: string) => {
-  if (!text) return null;
-
-  // 1. Split by Code Blocks (`code`) - highest precedence
-  const codeParts = text.split(/(`[^`]+`)/g);
-
-  return codeParts.map((part, index) => {
-    // If it's a code block
-    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) {
-      return (
-        <code key={`c-${index}`} className="bg-slate-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-slate-200">
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-
-    // 2. Parse URLs - Second precedence
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urlParts = part.split(urlRegex);
-
-    return (
-        <span key={`u-group-${index}`}>
-            {urlParts.map((uPart, uIndex) => {
-                if (uPart.match(urlRegex)) {
-                    return (
-                        <a 
-                            key={`u-${index}-${uIndex}`} 
-                            href={uPart} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-600 hover:underline break-all"
-                            onClick={(e) => e.stopPropagation()} // Prevent bubble click
-                        >
-                            {uPart}
-                        </a>
-                    );
-                }
-
-                // 3. Parse Mentions (@Username) - Third precedence
-                const mentionParts = uPart.split(/(@[a-zA-Z0-9_\-]+)/g);
-                return (
-                    <span key={`m-group-${index}-${uIndex}`}>
-                        {mentionParts.map((mPart, mIndex) => {
-                            if (mPart.startsWith('@') && mPart.length > 1) {
-                                return (
-                                    <span key={`m-${index}-${uIndex}-${mIndex}`} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium mx-0.5 cursor-pointer hover:bg-blue-200 transition-colors">
-                                        {mPart}
-                                    </span>
-                                );
-                            }
-                            
-                            // 4. Parse Bold inside non-mention text
-                            return parseBold(mPart, `b-${index}-${uIndex}-${mIndex}`);
-                        })}
-                    </span>
-                );
-            })}
-        </span>
-    );
-  });
+const isImageUrl = (url: string) => {
+  return /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(url);
 };
 
-const parseBold = (text: string, keyPrefix: string) => {
-    const boldParts = text.split(/(\*[^*]+\*)/g);
-    return boldParts.map((bPart, bIndex) => {
-        if (bPart.startsWith('*') && bPart.endsWith('*') && bPart.length > 1) {
-            const content = bPart.slice(1, -1);
-            return (
-                <strong key={`${keyPrefix}-b-${bIndex}`} className="font-semibold text-gray-900">
-                    {parseItalicAndStrike(content, `${keyPrefix}-b-${bIndex}`)}
-                </strong>
-            );
-        }
-        return parseItalicAndStrike(bPart, `${keyPrefix}-t-${bIndex}`);
-    });
-};
+// --- Parsers ---
 
+// 5. Italic & Strike
 const parseItalicAndStrike = (text: string, keyPrefix: string) => {
    const iParts = text.split(/(_[^_]+_)/g);
    return iParts.map((iPart, iIndex) => {
@@ -117,6 +46,131 @@ const parseStrike = (text: string, keyPrefix: string) => {
         return <span key={`${keyPrefix}-tx-${sIndex}`}>{sPart}</span>;
     });
 };
+
+// 4. Bold
+const parseBold = (text: string, keyPrefix: string) => {
+    const boldParts = text.split(/(\*[^*]+\*)/g);
+    return boldParts.map((bPart, bIndex) => {
+        if (bPart.startsWith('*') && bPart.endsWith('*') && bPart.length > 1) {
+            const content = bPart.slice(1, -1);
+            return (
+                <strong key={`${keyPrefix}-b-${bIndex}`} className="font-semibold text-gray-900">
+                    {parseItalicAndStrike(content, `${keyPrefix}-b-${bIndex}`)}
+                </strong>
+            );
+        }
+        return parseItalicAndStrike(bPart, `${keyPrefix}-t-${bIndex}`);
+    });
+};
+
+// 3. Mentions
+const parseMentions = (text: string, keyPrefix: string) => {
+    const mentionParts = text.split(/(@[a-zA-Z0-9_\-]+)/g);
+    return (
+        <span key={`${keyPrefix}-m-group`}>
+            {mentionParts.map((mPart, mIndex) => {
+                if (mPart.startsWith('@') && mPart.length > 1) {
+                    return (
+                        <span key={`${keyPrefix}-m-${mIndex}`} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium mx-0.5 cursor-pointer hover:bg-blue-200 transition-colors">
+                            {mPart}
+                        </span>
+                    );
+                }
+                return parseBold(mPart, `${keyPrefix}-m-${mIndex}`);
+            })}
+        </span>
+    );
+};
+
+// 2. URLs & Images
+const parseUrlsAndImages = (text: string, keyPrefix: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urlParts = text.split(urlRegex);
+
+    return (
+        <span key={`${keyPrefix}-u-group`}>
+            {urlParts.map((uPart, uIndex) => {
+                if (uPart.match(urlRegex)) {
+                    if (isImageUrl(uPart)) {
+                        return (
+                             <div key={`${keyPrefix}-img-${uIndex}`} className="block my-2">
+                                <img 
+                                    src={uPart} 
+                                    alt="attachment"
+                                    className="max-w-full sm:max-w-sm max-h-80 object-contain rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:opacity-95 transition-opacity bg-gray-50"
+                                    onClick={(e) => { e.stopPropagation(); window.open(uPart, '_blank'); }}
+                                    loading="lazy"
+                                />
+                             </div>
+                        );
+                    }
+                    return (
+                        <a 
+                            key={`${keyPrefix}-u-${uIndex}`} 
+                            href={uPart} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 hover:underline break-all"
+                            onClick={(e) => e.stopPropagation()} 
+                        >
+                            {uPart}
+                        </a>
+                    );
+                }
+                return parseMentions(uPart, `${keyPrefix}-u-${uIndex}`);
+            })}
+        </span>
+    );
+};
+
+// 1. Blockquotes
+const parseBlockquotes = (text: string, keyPrefix: string) => {
+    // Split by lines that start with '> '
+    // We use a regex that captures the quote including the newline before it if exists
+    const quoteParts = text.split(/((?:^|\n)>\s[^\n]+)/g);
+    
+    return quoteParts.map((part, index) => {
+        const trimmed = part.trim();
+        if (trimmed.startsWith('>')) {
+            // Remove the '>' and optional space
+            const content = trimmed.substring(1).trim();
+            return (
+                <div key={`${keyPrefix}-bq-${index}`} className="border-l-4 border-gray-300 pl-3 py-1 my-1 italic text-gray-600 bg-gray-50/50 rounded-r">
+                    {parseUrlsAndImages(content, `${keyPrefix}-bq-${index}`)}
+                </div>
+            );
+        }
+        // Handle newlines explicitly if split consumed them? 
+        // split regex includes newlines in the capture group if configured, 
+        // but here 'part' might be just "\n" or text.
+        // We pass strictly to next parser.
+        return parseUrlsAndImages(part, `${keyPrefix}-bq-text-${index}`);
+    });
+};
+
+
+// Root Parser: Code Blocks
+const formatContent = (text: string) => {
+  if (!text) return null;
+
+  // Split by Code Blocks (`code`) - highest precedence
+  const codeParts = text.split(/(`[^`]+`)/g);
+
+  return codeParts.map((part, index) => {
+    // If it's a code block
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) {
+      return (
+        <code key={`c-${index}`} className="bg-slate-100 text-red-500 px-1.5 py-0.5 rounded text-sm font-mono border border-slate-200 align-middle">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    
+    // Parse everything else
+    return parseBlockquotes(part, `root-${index}`);
+  });
+};
+
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ 
     message, 
@@ -181,7 +235,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderActions = () => {
     if (!isMine || isEditing) return null;
     return (
-        <div className={`absolute top-[-12px] right-4 bg-white shadow-sm border border-gray-200 rounded-md flex items-center p-0.5 transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className={`absolute top-[-12px] right-4 bg-white shadow-sm border border-gray-200 rounded-md flex items-center p-0.5 transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'} z-10`}>
              <button 
                 onClick={() => setIsEditing(true)}
                 className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" 
@@ -207,7 +261,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // EDIT MODE RENDERER
   if (isEditing) {
       return (
-          <div className="px-4 py-2 bg-slate-50 border-l-4 border-slate-300 ml-4">
+          <div className="px-4 py-2 bg-slate-50 border-l-4 border-slate-300 ml-4 rounded-r">
               <textarea 
                 className="w-full border border-gray-300 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={editContent}

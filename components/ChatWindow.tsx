@@ -5,6 +5,7 @@ import { api } from '../services/gas';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import EditChannelModal from './EditChannelModal';
+import { useToast } from '../contexts/ToastContext';
 
 interface ChatWindowProps {
   channel: Channel;
@@ -22,6 +23,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
   const [showChannelSettings, setShowChannelSettings] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { addToast } = useToast();
   
   // Create a map for fast user lookups
   const userMap = useRef<Record<string, User>>({});
@@ -87,7 +89,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
         await api.sendMessage(channel.channel_id, currentUser.user_id, content);
     } catch (error) {
         console.error("Failed to send", error);
-        alert("Failed to send message. Check console.");
+        addToast("Failed to send message. Connection failed.", 'error');
     } finally {
         setIsSending(false);
     }
@@ -100,6 +102,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
           await api.editMessage(messageId, newContent);
       } catch (e) {
           console.error("Failed to edit", e);
+          addToast("Failed to edit message.", 'error');
       }
   };
 
@@ -110,6 +113,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
           await api.deleteMessage(messageId);
       } catch (e) {
           console.error("Failed to delete", e);
+          addToast("Failed to delete message.", 'error');
       }
   };
 
@@ -117,10 +121,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channel, currentUser, users, on
       if (confirm(`Are you sure you want to delete #${channel.channel_name}? This cannot be undone.`)) {
           try {
               await api.deleteChannel(channel.channel_id);
+              addToast(`Channel #${channel.channel_name} deleted.`, 'success');
               onChannelDeleted();
           } catch (e) {
-              alert("Failed to delete channel");
               console.error(e);
+              addToast("Failed to delete channel.", 'error');
           }
       }
   };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/gas';
 import { User, Channel } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 interface CreateDMModalProps {
   onClose: () => void;
@@ -12,6 +13,7 @@ interface CreateDMModalProps {
 const CreateDMModal: React.FC<CreateDMModalProps> = ({ onClose, onCreated, currentUser, users }) => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const { addToast } = useToast();
 
   // Filter out self and search
   const filteredUsers = users.filter(u => 
@@ -24,11 +26,12 @@ const CreateDMModal: React.FC<CreateDMModalProps> = ({ onClose, onCreated, curre
     setLoading(true);
     try {
       const dmChannel = await api.createDM(targetUser.user_id, currentUser.user_id);
+      addToast(`Direct secure line opened with ${targetUser.display_name}.`, 'success');
       onCreated(dmChannel);
       onClose();
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Failed to open secure line");
+      addToast(error.message || "Failed to open secure line", 'error');
     } finally {
       setLoading(false);
     }

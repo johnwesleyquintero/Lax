@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/gas';
 import { User } from '../types';
 import { APP_CONFIG } from '../constants';
+import { useToast } from '../contexts/ToastContext';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;
@@ -27,6 +28,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
 
   // Initialize Google Button
   useEffect(() => {
@@ -45,10 +47,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         // Use Google data to register/login
         const user = await api.createUser(payload.email, payload.name);
         localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+        addToast(`Welcome back, ${user.display_name}`, 'success');
         onLogin(user);
       } catch (error) {
         console.error("Google Auth Error", error);
-        alert("Failed to authenticate with Google");
+        addToast("Failed to authenticate with Google", 'error');
       } finally {
         setLoading(false);
       }
@@ -82,7 +85,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     };
 
     initializeGoogle();
-  }, [onLogin]);
+  }, [onLogin, addToast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +95,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     try {
       const user = await api.createUser(email, name);
       localStorage.setItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+      addToast("Credentials Accepted. Welcome.", 'success');
       onLogin(user);
     } catch (error) {
       console.error(error);
-      alert("Login failed");
+      addToast("Login failed. Check connection.", 'error');
     } finally {
       setLoading(false);
     }

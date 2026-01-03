@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/gas';
 import { User, Channel } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 interface CreateChannelModalProps {
   onClose: () => void;
@@ -12,6 +13,7 @@ const CreateChannelModal: React.FC<CreateChannelModalProps> = ({ onClose, onCrea
   const [name, setName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,11 +22,12 @@ const CreateChannelModal: React.FC<CreateChannelModalProps> = ({ onClose, onCrea
     setLoading(true);
     try {
       const newChannel = await api.createChannel(name, isPrivate, currentUser.user_id);
+      addToast(`Channel #${newChannel.channel_name} created.`, 'success');
       onCreated(newChannel);
       onClose();
     } catch (error) {
       console.error(error);
-      alert("Failed to create channel");
+      addToast("Failed to create channel. Try again.", 'error');
     } finally {
       setLoading(false);
     }

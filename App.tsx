@@ -7,8 +7,11 @@ import ChatWindow from './components/ChatWindow';
 import LoginScreen from './components/LoginScreen';
 import SettingsModal from './components/SettingsModal';
 import UserProfileModal from './components/UserProfileModal';
+import { ToastProvider } from './contexts/ToastContext';
+import ToastContainer from './components/ToastContainer';
+import CommandPalette from './components/CommandPalette';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChannelId, setCurrentChannelId] = useState<string>('');
@@ -178,8 +181,26 @@ const App: React.FC = () => {
           onClose={() => setSelectedUser(null)} 
         />
       )}
+      
+      <CommandPalette 
+        channels={channels} 
+        users={users} 
+        currentUser={currentUser}
+        onSelectChannel={setCurrentChannelId}
+        onChannelCreated={handleChannelAction}
+      />
+
+      <ToastContainer />
     </div>
   );
 };
+
+const App: React.FC = () => {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
 
 export default App;

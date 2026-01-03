@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/gas';
 import { Channel } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 interface EditChannelModalProps {
   channel: Channel;
@@ -12,6 +13,7 @@ const EditChannelModal: React.FC<EditChannelModalProps> = ({ channel, onClose, o
   const [name, setName] = useState(channel.channel_name);
   const [isPrivate, setIsPrivate] = useState(channel.is_private);
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,11 +22,12 @@ const EditChannelModal: React.FC<EditChannelModalProps> = ({ channel, onClose, o
     setLoading(true);
     try {
       const updatedChannel = await api.updateChannel(channel.channel_id, name, isPrivate);
+      addToast(`Channel #${updatedChannel.channel_name} updated.`, 'success');
       onUpdated(updatedChannel);
       onClose();
     } catch (error) {
       console.error(error);
-      alert("Failed to update channel");
+      addToast("Failed to update channel.", 'error');
     } finally {
       setLoading(false);
     }
