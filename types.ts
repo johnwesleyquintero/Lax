@@ -15,7 +15,8 @@ export interface Channel {
   is_private: boolean;
   created_by: string;
   created_at: string;
-  type?: 'channel' | 'dm'; // New field
+  type?: 'channel' | 'dm';
+  last_message_at?: string; // New field for unread tracking
 }
 
 export interface Message {

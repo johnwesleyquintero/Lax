@@ -189,12 +189,24 @@ class GasService {
       setTimeout(() => {
         const allChannels: Channel[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CHANNELS) || '[]');
         const members: any[] = JSON.parse(localStorage.getItem('op_chat_channel_members') || '[]');
-        
+        const allMessages: Message[] = JSON.parse(localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.MESSAGES) || '[]');
+
         // Filter channels where user is a member
         const myChannelIds = new Set(members.filter((m: any) => m.user_id === userId).map((m: any) => m.channel_id));
         const myChannels = allChannels.filter(c => myChannelIds.has(c.channel_id));
+
+        // Attach last_message_at
+        const channelsWithStats = myChannels.map(c => {
+            const channelMessages = allMessages.filter(m => m.channel_id === c.channel_id);
+            if (channelMessages.length > 0) {
+                // Assuming messages are roughly order, but let's be safe
+                const lastMsg = channelMessages[channelMessages.length - 1];
+                return { ...c, last_message_at: lastMsg.created_at };
+            }
+            return c;
+        });
         
-        resolve(myChannels);
+        resolve(channelsWithStats);
       }, 300);
     });
   }

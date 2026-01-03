@@ -14,6 +14,7 @@ interface SidebarProps {
   onLogout: () => void;
   onChannelCreated: (channel: Channel) => void;
   onUserClick: (user: User) => void;
+  lastVisited: Record<string, string>;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -25,7 +26,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onLogout,
   onChannelCreated,
-  onUserClick
+  onUserClick,
+  lastVisited
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
@@ -151,29 +153,44 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
           {filteredGroupChannels.map((channel) => {
             const isActive = channel.channel_id === currentChannelId;
+            const visited = lastVisited[channel.channel_id];
+            const isUnread = !isActive && channel.last_message_at && (!visited || new Date(channel.last_message_at) > new Date(visited));
+
             return (
               <li key={channel.channel_id}>
                 <button
                   onClick={() => onSelectChannel(channel.channel_id)}
                   title={isCollapsed ? channel.channel_name : undefined}
-                  className={`w-full flex items-center transition-colors rounded ${
+                  className={`w-full flex items-center transition-colors rounded relative ${
                     isCollapsed 
                         ? 'justify-center h-10 w-10 mx-auto' 
                         : 'text-left px-4 py-1.5'
                   } ${
                     isActive 
                       ? 'bg-blue-700 text-white' 
-                      : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                      : 'hover:bg-slate-800'
+                  } ${
+                    isUnread && !isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
+                  {/* Unread Indicator for Collapsed View */}
+                  {isCollapsed && isUnread && (
+                     <div className="absolute top-0 right-0 w-3 h-3 bg-white border-2 border-slate-900 rounded-full z-10"></div>
+                  )}
+
                   <span className={`text-lg leading-none ${isCollapsed ? 'opacity-100 text-xl' : 'text-opacity-70 mr-2 opacity-60'}`}>
                     {channel.is_private ? '🔒' : '#'}
                   </span>
                   
                   {!isCollapsed && (
-                      <span className={`truncate ${isActive ? 'font-medium' : ''}`}>
-                        {channel.channel_name}
-                      </span>
+                      <div className="flex items-center w-full min-w-0">
+                         <span className={`truncate flex-1 ${isActive ? 'font-medium' : ''} ${isUnread ? 'font-bold' : ''}`}>
+                            {channel.channel_name}
+                         </span>
+                         {isUnread && (
+                            <span className="w-2 h-2 rounded-full bg-white ml-2 shadow-sm flex-shrink-0"></span>
+                         )}
+                      </div>
                   )}
                 </button>
               </li>
@@ -191,6 +208,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           isCollapsed={isCollapsed}
           searchQuery={searchQuery}
           onChannelCreated={onChannelCreated}
+          lastVisited={lastVisited}
         />
 
       </div>

@@ -18,14 +18,36 @@ const App: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  // Restore session
+  // Map of channel_id -> ISO string of last visit time
+  const [lastVisited, setLastVisited] = useState<Record<string, string>>({});
+
+  // Restore session & Last Visited
   useEffect(() => {
     const storedUser = localStorage.getItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER);
     if (storedUser) {
       setCurrentUser(JSON.parse(storedUser));
     }
+    
+    // Load last visited state
+    const storedVisits = localStorage.getItem('op_chat_last_visited');
+    if (storedVisits) {
+        setLastVisited(JSON.parse(storedVisits));
+    }
+
     setLoadingInitial(false);
   }, []);
+
+  // Track Last Visited Channel
+  useEffect(() => {
+    if (currentChannelId) {
+        const now = new Date().toISOString();
+        setLastVisited(prev => {
+            const updated = { ...prev, [currentChannelId]: now };
+            localStorage.setItem('op_chat_last_visited', JSON.stringify(updated));
+            return updated;
+        });
+    }
+  }, [currentChannelId]);
 
   const loadMetadata = useCallback(async () => {
       if (!currentUser) return;
@@ -49,9 +71,14 @@ const App: React.FC = () => {
   }, [currentUser, currentChannelId]);
 
   // Fetch Metadata (Channels, Users)
+  // We enable polling for channels to update unread status periodically
   useEffect(() => {
-    loadMetadata();
-  }, [loadMetadata]);
+    if (currentUser) {
+        loadMetadata();
+        const interval = setInterval(loadMetadata, 10000); // Refresh channel list every 10s to catch new unreads
+        return () => clearInterval(interval);
+    }
+  }, [loadMetadata, currentUser]);
 
   const handleLogout = () => {
     localStorage.removeItem(APP_CONFIG.LOCAL_STORAGE_KEYS.CURRENT_USER);
@@ -60,8 +87,6 @@ const App: React.FC = () => {
   };
 
   // Called when Create or Join happens.
-  // Ideally, JoinChannelModal should pass the full object, but sometimes we just reload.
-  // We reload metadata to be safe and consistent.
   const refreshChannels = async () => {
       if (currentUser) {
           const fetchedChannels = await api.getChannels(currentUser.user_id);
@@ -122,6 +147,7 @@ const App: React.FC = () => {
         onLogout={handleLogout}
         onChannelCreated={handleChannelAction}
         onUserClick={setSelectedUser}
+        lastVisited={lastVisited}
       />
       
       <main className="flex-1 flex flex-col min-w-0 bg-white">

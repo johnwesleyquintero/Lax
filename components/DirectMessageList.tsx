@@ -11,6 +11,7 @@ interface DirectMessageListProps {
   isCollapsed: boolean;
   searchQuery: string;
   onChannelCreated: (channel: Channel) => void;
+  lastVisited: Record<string, string>;
 }
 
 const DirectMessageList: React.FC<DirectMessageListProps> = ({
@@ -21,7 +22,8 @@ const DirectMessageList: React.FC<DirectMessageListProps> = ({
   onSelectChannel,
   isCollapsed,
   searchQuery,
-  onChannelCreated
+  onChannelCreated,
+  lastVisited
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -90,30 +92,45 @@ const DirectMessageList: React.FC<DirectMessageListProps> = ({
           {filteredDMs.map((channel) => {
               const isActive = channel.channel_id === currentChannelId;
               const { name, avatar } = getDMInfo(channel);
+              const visited = lastVisited[channel.channel_id];
+              const isUnread = !isActive && channel.last_message_at && (!visited || new Date(channel.last_message_at) > new Date(visited));
+
               return (
                   <li key={channel.channel_id}>
                       <button
                           onClick={() => onSelectChannel(channel.channel_id)}
                           title={isCollapsed ? name : undefined}
-                          className={`w-full flex items-center transition-colors rounded ${
+                          className={`w-full flex items-center transition-colors rounded relative ${
                               isCollapsed 
                                   ? 'justify-center h-10 w-10 mx-auto' 
                                   : 'text-left px-4 py-1.5'
                           } ${
                               isActive 
                                   ? 'bg-blue-700 text-white' 
-                                  : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                                  : 'hover:bg-slate-800'
+                          } ${
+                              isUnread && !isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                           }`}
                       >
+                          {/* Unread Indicator for Collapsed View */}
+                          {isCollapsed && isUnread && (
+                              <div className="absolute top-0 right-0 w-3 h-3 bg-white border-2 border-slate-900 rounded-full z-10"></div>
+                          )}
+
                           {/* Avatar for DM */}
                           <div className={`flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold ${isCollapsed ? 'w-6 h-6 text-sm' : 'w-4 h-4 mr-2'} ${getColor(name)} text-white`}>
                               {avatar}
                           </div>
                           
                           {!isCollapsed && (
-                              <span className={`truncate ${isActive ? 'font-medium' : ''}`}>
-                                  {name}
-                              </span>
+                              <div className="flex items-center w-full min-w-0">
+                                  <span className={`truncate flex-1 ${isActive ? 'font-medium' : ''} ${isUnread ? 'font-bold' : ''}`}>
+                                      {name}
+                                  </span>
+                                  {isUnread && (
+                                    <span className="w-2 h-2 rounded-full bg-white ml-2 shadow-sm flex-shrink-0"></span>
+                                  )}
+                              </div>
                           )}
                       </button>
                   </li>
